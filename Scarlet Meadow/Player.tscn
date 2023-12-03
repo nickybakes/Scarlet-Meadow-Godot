@@ -1,0 +1,86 @@
+[gd_scene load_steps=14 format=3 uid="uid://bw6lm14mw5vy1"]
+
+[ext_resource type="Script" path="res://Dev/PlayerControl/PlayerStatus.gd" id="1_kkatd"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/StateMachine.gd" id="2_k8nsj"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Idle.gd" id="3_le83v"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Run.gd" id="4_liwpc"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Skid.gd" id="5_hssyf"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/JumpFall.gd" id="6_mpklq"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/SideFlip.gd" id="7_eea6y"]
+[ext_resource type="Script" path="res://Dev/PlayerControl/InputBuffer.gd" id="7_xbthf"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Walljump.gd" id="8_wjfm8"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_dgtxy"]
+
+[sub_resource type="PrismMesh" id="PrismMesh_7b5d8"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dhpd8"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_y38ci"]
+radius = 0.25
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 3
+axis_lock_angular_x = true
+axis_lock_angular_y = true
+axis_lock_angular_z = true
+floor_constant_speed = true
+floor_max_angle = 0.872665
+floor_snap_length = 0.25
+script = ExtResource("1_kkatd")
+
+[node name="Model" type="Node3D" parent="."]
+
+[node name="ModelPitch" type="Node3D" parent="Model"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Model/ModelPitch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CapsuleMesh_dgtxy")
+skeleton = NodePath("")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Model/ModelPitch"]
+transform = Transform3D(0.525227, 0, 0, 0, 6.88752e-08, 0.525227, 0, -0.525227, 6.88752e-08, 0, 1.251, -0.635)
+mesh = SubResource("PrismMesh_7b5d8")
+skeleton = NodePath("")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_dhpd8")
+
+[node name="StateMachine" type="Node" parent="."]
+script = ExtResource("2_k8nsj")
+initial_state = NodePath("Idle")
+
+[node name="Idle" type="Node" parent="StateMachine"]
+script = ExtResource("3_le83v")
+
+[node name="Run" type="Node" parent="StateMachine"]
+script = ExtResource("4_liwpc")
+
+[node name="Skid" type="Node" parent="StateMachine"]
+script = ExtResource("5_hssyf")
+
+[node name="JumpFall" type="Node" parent="StateMachine"]
+script = ExtResource("6_mpklq")
+
+[node name="SideFlip" type="Node" parent="StateMachine"]
+script = ExtResource("7_eea6y")
+
+[node name="Walljump" type="Node" parent="StateMachine"]
+script = ExtResource("8_wjfm8")
+
+[node name="CameraTwist" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64689, 0)
+
+[node name="CameraPitch" type="Node3D" parent="CameraTwist"]
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraTwist/CameraPitch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 0, 0)
+shape = SubResource("SphereShape3D_y38ci")
+spring_length = 7.0
+
+[node name="Camera3D" type="Camera3D" parent="CameraTwist/CameraPitch/SpringArm3D"]
+
+[node name="InputBuffer" type="Node" parent="."]
+script = ExtResource("7_xbthf")
