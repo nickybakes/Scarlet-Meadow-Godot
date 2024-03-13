@@ -4,16 +4,13 @@ extends PlayerState
 var direction : Vector3
 
 func _init():
-	jump_multiplier = 1.5
-	speed_multiplier = .8
-	#control_rotation = false
+	gravity_enabled = false
 	
 func enter(previousState : Enums.STATE, _msg := {}):
 	direction = _msg["direction"]
-	player.requested_move_direction = direction
-	player.velocity = direction * player.current_speed()
+	player.requested_move_direction = -direction
+	player.velocity = (-direction + Vector3(0, 8, 0)) * player.current_speed()
 	player.do_jump()
-	player.grounded = false
 	pass
 
 func update(delta: float) -> void:

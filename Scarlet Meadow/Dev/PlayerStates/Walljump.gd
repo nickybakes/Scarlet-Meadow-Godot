@@ -7,7 +7,6 @@ func _init():
 	jump_multiplier = 1.5
 	speed_multiplier = 1.0
 	rotate_weight = 0.8
-	control_rotation = true
 	
 func enter(previousState : Enums.STATE, _msg := {}):
 	direction = _msg["direction"]

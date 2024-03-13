@@ -1,5 +1,6 @@
-[gd_scene load_steps=11 format=3 uid="uid://64lboxy63whs"]
+[gd_scene load_steps=12 format=3 uid="uid://64lboxy63whs"]
 
+[ext_resource type="Script" path="res://Dev/Managers/PriorityManager.gd" id="1_81yno"]
 [ext_resource type="PackedScene" uid="uid://bw6lm14mw5vy1" path="res://Dev/PlayerControl/Player.tscn" id="1_dvsjc"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ogoo2"]
@@ -32,6 +33,9 @@ data = PackedVector3Array(-0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0
 data = PackedVector3Array(0, 0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0, 0.5, 0.5, 0, 0.5, -0.5, 0.5, -0.5, 0.5, 0, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, -0.5, -0.5, -0.5, 0, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5)
 
 [node name="Node3D" type="Node3D"]
+
+[node name="PriorityManager" type="Node" parent="."]
+script = ExtResource("1_81yno")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_6m74n")

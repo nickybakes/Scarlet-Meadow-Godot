@@ -109,6 +109,7 @@ look_right={
 3d_physics/layer_1="World"
 3d_physics/layer_2="World (Ignore Camera)"
 3d_physics/layer_3="Player"
+3d_physics/layer_4="Enemy"
 
 [rendering]
 

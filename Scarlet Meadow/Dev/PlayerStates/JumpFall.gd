@@ -2,7 +2,7 @@
 extends PlayerState
 
 func _init():
-	control_rotation = false
+	rotation_mode = Enums.ROTATION_MODE.None
 	
 func enter(previousState : Enums.STATE, _msg := {}):
 	speed_multiplier = 1;
@@ -49,6 +49,8 @@ func physics_update(delta: float) -> void:
 	
 	if player.input_buffer.is_action_just_pressed(Enums.INPUT.Interact):
 		if !top and ((mid and bot) or (!mid and bot) or (mid and !bot)) and player.time_in_air > .2:
+			normal_to_use = Vector3(normal_to_use.x, 0, normal_to_use.z).normalized()
+			state_machine.transition_to(Enums.STATE.Vault, {"direction": normal_to_use})
 			print("vault")
 			return
 			

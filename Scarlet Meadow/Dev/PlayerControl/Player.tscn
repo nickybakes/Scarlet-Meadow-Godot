@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://bw6lm14mw5vy1"]
+[gd_scene load_steps=17 format=3 uid="uid://bw6lm14mw5vy1"]
 
 [ext_resource type="Script" path="res://Dev/PlayerControl/PlayerStatus.gd" id="1_kkatd"]
 [ext_resource type="Script" path="res://Dev/PlayerStates/StateMachine.gd" id="2_k8nsj"]
@@ -9,15 +9,20 @@
 [ext_resource type="Script" path="res://Dev/PlayerStates/SideFlip.gd" id="7_eea6y"]
 [ext_resource type="Script" path="res://Dev/PlayerControl/InputBuffer.gd" id="7_xbthf"]
 [ext_resource type="Script" path="res://Dev/PlayerStates/Walljump.gd" id="8_wjfm8"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Vault.gd" id="9_0x02l"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/Climb.gd" id="10_rlaay"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_dgtxy"]
 
 [sub_resource type="PrismMesh" id="PrismMesh_7b5d8"]
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dhpd8"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_61shg"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_y38ci"]
 radius = 0.25
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_aem50"]
+radius = 1.0
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 4
@@ -45,8 +50,8 @@ mesh = SubResource("PrismMesh_7b5d8")
 skeleton = NodePath("")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-shape = SubResource("CapsuleShape3D_dhpd8")
+transform = Transform3D(1.00346, 0, 0, 0, 1.00346, 0, 0, 0, 1.00346, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_61shg")
 
 [node name="StateMachine" type="Node" parent="."]
 script = ExtResource("2_k8nsj")
@@ -70,6 +75,12 @@ script = ExtResource("7_eea6y")
 [node name="Walljump" type="Node" parent="StateMachine"]
 script = ExtResource("8_wjfm8")
 
+[node name="Vault" type="Node" parent="StateMachine"]
+script = ExtResource("9_0x02l")
+
+[node name="Climb" type="Node" parent="StateMachine"]
+script = ExtResource("10_rlaay")
+
 [node name="CameraTwist" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64689, 0)
 
@@ -84,3 +95,11 @@ spring_length = 7.0
 
 [node name="InputBuffer" type="Node" parent="."]
 script = ExtResource("7_xbthf")
+
+[node name="AttackDetector" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 8
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackDetector"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -1)
+shape = SubResource("SphereShape3D_aem50")

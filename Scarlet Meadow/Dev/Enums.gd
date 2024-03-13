@@ -6,7 +6,9 @@ enum STATE
 	Skid,
 	JumpFall,
 	SideFlip,
-	Walljump
+	Walljump,
+	Vault,
+	Climb
 }
 
 enum INPUT
@@ -18,4 +20,19 @@ enum INPUT
 	Dodge,
 	Block,
 	Lasso
+}
+
+enum ROTATION_MODE
+{
+	Velocity,
+	Chosen_Direction,
+	None
+}
+
+enum PRIORITY
+{
+	Unblockable,
+	Strike,
+	Power,
+	Super
 }

@@ -11,7 +11,8 @@ var state_machine = null
 var speed_multiplier := 1.0
 var jump_multiplier := 1.0
 var rotate_weight := 0.5
-var control_rotation := true
+var rotation_mode := Enums.ROTATION_MODE.Velocity
+var gravity_enabled := true
 
 
 # Virtual function. Receives events from the `_unhandled_input()` callback.

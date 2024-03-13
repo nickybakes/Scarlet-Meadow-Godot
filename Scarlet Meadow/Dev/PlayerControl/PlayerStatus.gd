@@ -15,6 +15,8 @@ var requested_move_direction := Vector3(0, 0, 0);
 var last_non_zero_horizontal_velocity := Vector3(0, 0, -1)
 var last_non_zero_requested_move_direction := Vector3(0, 0, -1)
 
+var chosen_rotation_direction := Vector2(0, -1)
+
 var time_in_air := 0.0
 var time_grounded := 0.0
 var prev_time_in_air := 0.0
@@ -93,8 +95,11 @@ func _physics_process(delta: float) -> void:
 	grounded = is_on_floor()
 	jump_and_gravity(delta)
 	control_movement(delta)
-	if(state_machine.state.control_rotation):
-		control_rotation(delta)
+	match(state_machine.state.rotation_mode):
+		Enums.ROTATION_MODE.Velocity:
+			control_rotation_velocity(delta)
+		Enums.ROTATION_MODE.Chosen_Direction:
+			control_rotation_chosen_direction(delta)
 	
 	move_and_slide()
 	
@@ -146,8 +151,8 @@ func control_movement(delta: float) -> void:
 			velocity.x = velocity.x - speedDecayDirection.x * AIR_SPEED_CHANGE_AMOUNT * delta
 			velocity.z = velocity.z - speedDecayDirection.y * AIR_SPEED_CHANGE_AMOUNT * delta
 
-func control_rotation(delta: float) -> void:
-	var top_down_velocity = get_top_down_velocity();
+func control_rotation_velocity(delta: float) -> void:
+	var top_down_velocity = get_top_down_velocity()
 	if top_down_velocity:
 		top_down_velocity = top_down_velocity.normalized()
 		var target_rotation = atan2(-top_down_velocity.x, -top_down_velocity.y)
@@ -157,6 +162,14 @@ func control_rotation(delta: float) -> void:
 #		var target_rotation = atan2(-requested_move_direction.x, -requested_move_direction.z)
 #		var rotation = lerp_angle(model.rotation.y, target_rotation, .5)
 #		model.rotation = Vector3(0, rotation, 0)
+
+func control_rotation_chosen_direction(delta: float) -> void:
+	var top_down_direction = chosen_rotation_direction
+	if top_down_direction:
+		top_down_direction = top_down_direction.normalized()
+		var target_rotation = atan2(-top_down_direction.x, -top_down_direction.y)
+		var rotation = lerp_angle(model.rotation.y, target_rotation, state_machine.state.rotate_weight)
+		model.rotation = Vector3(0, rotation, 0)
 
 func jump_and_gravity(delta: float) -> void:
 	if(not was_grounded && grounded):
@@ -178,10 +191,11 @@ func jump_and_gravity(delta: float) -> void:
 		time_in_air += delta
 				
 		# Add the gravity.
-		if(velocity.y < 0):
-			velocity.y -= GRAVITY * FALL_GRAVITY_MULTI * delta
-		else:
-			velocity.y -= GRAVITY * delta
+		if(state_machine.state.gravity_enabled):
+			if(velocity.y < 0):
+				velocity.y -= GRAVITY * FALL_GRAVITY_MULTI * delta
+			else:
+				velocity.y -= GRAVITY * delta
 				
 func do_jump():
 	var jump_multiplier = 1.0
