@@ -237,3 +237,15 @@ func check_wall_interactions() -> Array:
 	
 	return [bot, mid, top]
 
+
+var detectedVictims = [];
+
+
+func _on_attack_detector_body_entered(body):
+	detectedVictims.push_back(body);
+	pass # Replace with function body.
+
+
+func _on_attack_detector_body_exited(body):
+	detectedVictims.erase(body);
+	pass # Replace with function body.

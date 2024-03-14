@@ -1,0 +1,43 @@
+[gd_scene load_steps=6 format=3 uid="uid://dbsqoeip3bqga"]
+
+[ext_resource type="Script" path="res://Dev/Objects/Enemy.gd" id="1_ylkbn"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_ihoyb"]
+
+[sub_resource type="PrismMesh" id="PrismMesh_653ts"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1i28g"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_3hbja"]
+radius = 1.0
+
+[node name="Enemy" type="CharacterBody3D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_ylkbn")
+
+[node name="Model" type="Node3D" parent="."]
+
+[node name="ModelPitch" type="Node3D" parent="Model"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Model/ModelPitch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CapsuleMesh_ihoyb")
+skeleton = NodePath("")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Model/ModelPitch"]
+transform = Transform3D(0.525227, 0, 0, 0, 6.88752e-08, 0.525227, 0, -0.525227, 6.88752e-08, 0, 1.251, -0.635)
+mesh = SubResource("PrismMesh_653ts")
+skeleton = NodePath("")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1.00346, 0, 0, 0, 1.00346, 0, 0, 0, 1.00346, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_1i28g")
+
+[node name="AttackDetector" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackDetector"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -1)
+shape = SubResource("SphereShape3D_3hbja")

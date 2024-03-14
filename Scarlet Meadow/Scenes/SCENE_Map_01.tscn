@@ -1,7 +1,8 @@
-[gd_scene load_steps=12 format=3 uid="uid://64lboxy63whs"]
+[gd_scene load_steps=13 format=3 uid="uid://64lboxy63whs"]
 
 [ext_resource type="Script" path="res://Dev/Managers/PriorityManager.gd" id="1_81yno"]
 [ext_resource type="PackedScene" uid="uid://bw6lm14mw5vy1" path="res://Dev/PlayerControl/Player.tscn" id="1_dvsjc"]
+[ext_resource type="PackedScene" uid="uid://dbsqoeip3bqga" path="res://Dev/Objects/Enemy.tscn" id="3_inbfp"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ogoo2"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -179,3 +180,6 @@ shape = SubResource("ConcavePolygonShape3D_chjg1")
 
 [node name="Player" parent="." instance=ExtResource("1_dvsjc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 0)
+
+[node name="Enemy" parent="." instance=ExtResource("3_inbfp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.760153, 0, 3.98209)

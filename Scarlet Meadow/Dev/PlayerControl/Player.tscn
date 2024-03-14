@@ -16,13 +16,13 @@
 
 [sub_resource type="PrismMesh" id="PrismMesh_7b5d8"]
 
+[sub_resource type="SphereShape3D" id="SphereShape3D_aem50"]
+radius = 1.0
+
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_61shg"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_y38ci"]
 radius = 0.25
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_aem50"]
-radius = 1.0
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 4
@@ -48,6 +48,14 @@ skeleton = NodePath("")
 transform = Transform3D(0.525227, 0, 0, 0, 6.88752e-08, 0.525227, 0, -0.525227, 6.88752e-08, 0, 1.251, -0.635)
 mesh = SubResource("PrismMesh_7b5d8")
 skeleton = NodePath("")
+
+[node name="AttackDetector" type="Area3D" parent="Model"]
+collision_layer = 0
+collision_mask = 8
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Model/AttackDetector"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -1)
+shape = SubResource("SphereShape3D_aem50")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1.00346, 0, 0, 0, 1.00346, 0, 0, 0, 1.00346, 0, 1, 0)
@@ -96,10 +104,5 @@ spring_length = 7.0
 [node name="InputBuffer" type="Node" parent="."]
 script = ExtResource("7_xbthf")
 
-[node name="AttackDetector" type="Area3D" parent="."]
-collision_layer = 0
-collision_mask = 8
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackDetector"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -1)
-shape = SubResource("SphereShape3D_aem50")
+[connection signal="body_entered" from="Model/AttackDetector" to="." method="_on_attack_detector_body_entered"]
+[connection signal="body_exited" from="Model/AttackDetector" to="." method="_on_attack_detector_body_exited"]
