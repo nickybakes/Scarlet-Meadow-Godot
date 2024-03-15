@@ -44,6 +44,8 @@ func physics_update(delta: float) -> void:
 	
 	if player.input_buffer.is_action_just_pressed(Enums.INPUT.Interact):
 		if top and player.time_in_air > .2:
+			normal_to_use = top.normal.normalized();
+			state_machine.transition_to(Enums.STATE.Climb, {"wallNormal": normal_to_use});
 			print("climb")
 			return
 	

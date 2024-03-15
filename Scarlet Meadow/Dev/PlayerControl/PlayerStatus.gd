@@ -22,6 +22,7 @@ var time_grounded := 0.0
 var prev_time_in_air := 0.0
 var prev_time_grounded := 0.0
 var grounded := false
+var fake_grounded := false
 var was_grounded := false
 var road_runner_jump_available := false
 
@@ -104,7 +105,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	
 func control_movement(delta: float) -> void:
-	if(grounded):
+	if(grounded or fake_grounded):
 		if not requested_move_direction:
 			var decelAmount = 100
 			var topDownVelocity = get_top_down_velocity()
