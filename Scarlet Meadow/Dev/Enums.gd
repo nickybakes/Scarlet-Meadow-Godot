@@ -29,6 +29,12 @@ enum ROTATION_MODE
 	None
 }
 
+enum MOVEMENT_MODE
+{
+	Velocity,
+	None
+}
+
 enum PRIORITY
 {
 	Unblockable,

@@ -1,50 +1,66 @@
 # Run.gd
 extends PlayerState
 
-var initialVelocity : Vector3
+var initialWallDragDirection : Vector2
+var initialWallDragSpeed : float
 var wallNormal : Vector3
+var horizontalMoveAxis : Vector3
+var verticalMoveAxis : Vector3
 var climbingInput : Vector2
+var climbingDirection : Vector3
 var timeClimbing : float
 
 func _init():
 	gravity_enabled = false
+	rotation_mode = Enums.ROTATION_MODE.Chosen_Direction
+	movement_mode = Enums.MOVEMENT_MODE.None
 	
 func enter(previousState : Enums.STATE, _msg := {}):
 	timeClimbing = 0;
 	player.grounded = false;
 	player.fake_grounded = true;
 	wallNormal = _msg["wallNormal"]
-	initialVelocity = player.velocity;
-	if(initialVelocity.y < 0):
-		initialVelocity *= .5;
-	else:
-		initialVelocity = Vector3.ZERO;
+	player.chosen_rotation_direction = Vector2(-wallNormal.x, -wallNormal.z);
+	if(player.velocity == Vector3.ZERO):
+		player.velocity = Vector3(0, -.1, 0);
+	calculateMovementAxis();
+	calculateInitialWallSlide();
+
 		
 	#stick player to wall
 	player.velocity = wallNormal * -2;
 	for n in 4:
 		player.move_and_slide();
 		
-	player.velocity = initialVelocity;
+	moveAlongWall(initialWallDragDirection, initialWallDragSpeed);
 	pass
 	
 func exit():
 	player.time_in_air = 0.0;
 	player.fake_grounded = false;
+	
+func calculateInitialWallSlide():
+	var dot = player.velocity.normalized().dot(horizontalMoveAxis);
+	initialWallDragDirection = Vector2(dot, 1 - abs(dot));
+	initialWallDragSpeed = (player.velocity * .5).length();
+	
+func calculateMovementAxis():
+	horizontalMoveAxis = Vector3(wallNormal.z, 0, -wallNormal.x).normalized();
+	verticalMoveAxis = horizontalMoveAxis.cross(wallNormal);
+	
+func moveAlongWall(direction: Vector2, speed: float):
+	climbingInput = direction;
+	climbingDirection = (direction.x * horizontalMoveAxis + direction.y * verticalMoveAxis).normalized();
+	player.velocity = climbingDirection * speed;	
 
 func update(delta: float) -> void:
-	var player_input = player.get_requested_move_direction()	
-	var initialMoveSpeed = initialVelocity.length();
-	if(initialMoveSpeed > .2):
-		var decelAmount = 40
-		var currentVelDirection : Vector3 = initialVelocity/initialMoveSpeed
-		initialMoveSpeed = move_toward(initialMoveSpeed, 0, decelAmount * delta)
-		initialVelocity = currentVelDirection * initialMoveSpeed
-		player.velocity = initialVelocity;
-		print("aaa")
-	else:	
+	var player_input = player.get_basic_input_dir();
+	if(initialWallDragSpeed > 0):
+		initialWallDragSpeed = initialWallDragSpeed - (delta * 40);
+		moveAlongWall(initialWallDragDirection, initialWallDragSpeed);
+	else:
 		player.velocity = Vector3.ZERO;
-		player.requested_move_direction = player_input
+		moveAlongWall(player_input, 6);
 		
 	if(player.grounded and player_input):
 		state_machine.transition_to(Enums.STATE.Run)
@@ -59,3 +75,15 @@ func physics_update(delta: float) -> void:
 	if player.input_buffer.is_action_just_pressed(Enums.INPUT.Interact) and timeClimbing > .5:
 		state_machine.transition_to(Enums.STATE.JumpFall);
 		return
+		
+	var wall_check = player.raycast_climb(climbingDirection, wallNormal);
+	
+	var outset = wall_check[0]
+	var inset = wall_check[1]
+	var vault = wall_check[2]
+	
+	if !vault:
+		state_machine.transition_to(Enums.STATE.Vault, {"direction": wallNormal})
+		return
+		
+	#if outset

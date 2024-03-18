@@ -12,6 +12,7 @@ var speed_multiplier := 1.0
 var jump_multiplier := 1.0
 var rotate_weight := 0.5
 var rotation_mode := Enums.ROTATION_MODE.Velocity
+var movement_mode := Enums.MOVEMENT_MODE.Velocity
 var gravity_enabled := true
 
 

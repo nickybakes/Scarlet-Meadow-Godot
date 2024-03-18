@@ -73,8 +73,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func current_speed() -> float:
 	return SPEED * state_machine.state.speed_multiplier;
 	
+func get_basic_input_dir() -> Vector2:
+	return Input.get_vector("move_left", "move_right", "move_forward", "move_backward");
+	
 func get_requested_move_direction() -> Vector3:
-	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+	var input_dir = get_basic_input_dir();
 	var direction = (camera_twist.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	return direction;
 	
@@ -105,6 +108,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	
 func control_movement(delta: float) -> void:
+	if(state_machine.state.movement_mode == Enums.MOVEMENT_MODE.None):
+		return;
+	
 	if(grounded or fake_grounded):
 		if not requested_move_direction:
 			var decelAmount = 100
@@ -198,9 +204,9 @@ func jump_and_gravity(delta: float) -> void:
 			else:
 				velocity.y -= GRAVITY * delta
 				
-func do_jump():
+func do_jump(skipBoostCheck = false):
 	var jump_multiplier = 1.0
-	if(time_grounded < .2 and prev_time_in_air > .5):
+	if(!skipBoostCheck and time_grounded < .2 and prev_time_in_air > .5):
 		jump_multiplier = 1.6
 	velocity.y = sqrt(JUMP_HEIGHT * jump_multiplier * state_machine.state.jump_multiplier * 2 * GRAVITY)
 	road_runner_jump_available = false
@@ -214,8 +220,8 @@ func raycast_forward(vertical_offset: float, ray_length: float) -> Dictionary:
 		var origin = position + Vector3(0, vertical_offset, 0)
 		var end = position + Vector3(directions[n].x, vertical_offset, directions[n].z)
 		var query = PhysicsRayQueryParameters3D.create(origin, end, 0b0011, [self])
-		results[n] = space.intersect_ray(query)
 		query.collide_with_areas = false
+		results[n] = space.intersect_ray(query)
 	
 	if(not results[0]):
 		return results[1]
@@ -238,6 +244,24 @@ func check_wall_interactions() -> Array:
 	
 	return [bot, mid, top]
 
+
+func raycast_climb(climbingDirection: Vector3, wallNormal: Vector3) -> Array:
+	var results = [0, 0, 0]
+	var space = get_world_3d().direct_space_state
+	var radius = 1.0;
+	var centerOfPlayer = position + Vector3(0, 1, 0);
+	var origin1 = centerOfPlayer + (climbingDirection * radius);
+	var end1 = centerOfPlayer + (climbingDirection * -radius) + (wallNormal * -1);
+	var query = PhysicsRayQueryParameters3D.create(origin1, end1, 0b0011, [self])
+	query.collide_with_areas = false
+	results[0] = space.intersect_ray(query)
+	query.to = centerOfPlayer + (climbingDirection * radius * 2);
+	results[1] = space.intersect_ray(query)
+	query.from = centerOfPlayer + Vector3(0, 0.5, 0);
+	query.to = centerOfPlayer + Vector3(0, 0.5, 0) + (wallNormal * -1.5);
+	results[2] = space.intersect_ray(query)
+	
+	return results;
 
 var detectedVictims = [];
 
