@@ -226,22 +226,22 @@ func raycast_forward(vertical_offset: float, ray_length: float) -> Dictionary:
 	if(not results[0]):
 		return results[1]
 	return results[0]
-	
+
+func isWall(cast: Dictionary) -> Dictionary:
+	if(cast and not(cast.normal.y < .3 and cast.normal.y > -.3)):
+		return {};
+	return cast;
+
 func check_wall_interactions() -> Array:
 	var ray_length = 1.5
 	var bot = raycast_forward(0, ray_length)
 	var mid = raycast_forward(1, ray_length)
 	var top = raycast_forward(2, ray_length)
 	
-	if(bot and not(bot.normal.y < .3 and bot.normal.y > -.3)):
-		bot = {}
-		
-	if(mid and not(mid.normal.y < .3 and mid.normal.y > -.3)):
-		mid = {}
-		
-	if(top and not(top.normal.y < .3 and top.normal.y > -.3)):
-		top = {}
-	
+	bot = isWall(bot)
+	mid = isWall(mid)
+	top = isWall(top)
+
 	return [bot, mid, top]
 
 
@@ -251,15 +251,16 @@ func raycast_climb(climbingDirection: Vector3, wallNormal: Vector3) -> Array:
 	var radius = 1.0;
 	var centerOfPlayer = position + Vector3(0, 1, 0);
 	var origin1 = centerOfPlayer + (climbingDirection * radius);
+	results[2] = origin1;
 	var end1 = centerOfPlayer + (climbingDirection * -radius) + (wallNormal * -1);
 	var query = PhysicsRayQueryParameters3D.create(origin1, end1, 0b0011, [self])
 	query.collide_with_areas = false
 	results[0] = space.intersect_ray(query)
-	query.to = centerOfPlayer + (climbingDirection * radius * 2);
+	query.to = centerOfPlayer + (climbingDirection * radius * 2) + (wallNormal * -1);
 	results[1] = space.intersect_ray(query)
-	query.from = centerOfPlayer + Vector3(0, 0.5, 0);
-	query.to = centerOfPlayer + Vector3(0, 0.5, 0) + (wallNormal * -1.5);
-	results[2] = space.intersect_ray(query)
+	
+	for n in 2:
+		results[n] = isWall(results[n]);
 	
 	return results;
 

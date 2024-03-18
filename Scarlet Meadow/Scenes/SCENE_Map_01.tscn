@@ -77,6 +77,7 @@ skeleton = NodePath("../..")
 collision_layer = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Greybox/MeshInstance3D4/StaticBody3D"]
+transform = Transform3D(0.999999, 0, 0, 0, 0.999999, 0, 0, 0, 0.999999, 0, 0, 0)
 shape = SubResource("ConcavePolygonShape3D_3h4tj")
 
 [node name="MeshInstance3D13" type="MeshInstance3D" parent="Greybox"]

@@ -4,6 +4,7 @@ extends PlayerState
 var initialWallDragDirection : Vector2
 var initialWallDragSpeed : float
 var wallNormal : Vector3
+var altWallNormal: Vector3;
 var horizontalMoveAxis : Vector3
 var verticalMoveAxis : Vector3
 var climbingInput : Vector2
@@ -19,13 +20,14 @@ func enter(previousState : Enums.STATE, _msg := {}):
 	timeClimbing = 0;
 	player.grounded = false;
 	player.fake_grounded = true;
-	wallNormal = _msg["wallNormal"]
-	player.chosen_rotation_direction = Vector2(-wallNormal.x, -wallNormal.z);
+	
 	if(player.velocity == Vector3.ZERO):
 		player.velocity = Vector3(0, -.1, 0);
+		
+	setWall(_msg["wallNormal"])
+	altWallNormal = wallNormal;
 	calculateMovementAxis();
 	calculateInitialWallSlide();
-
 		
 	#stick player to wall
 	player.velocity = wallNormal * -2;
@@ -43,6 +45,14 @@ func calculateInitialWallSlide():
 	var dot = player.velocity.normalized().dot(horizontalMoveAxis);
 	initialWallDragDirection = Vector2(dot, 1 - abs(dot));
 	initialWallDragSpeed = (player.velocity * .5).length();
+	
+func setWall(normal: Vector3):
+	wallNormal = normal;
+	updateRotation(wallNormal)
+	calculateMovementAxis()
+	
+func updateRotation(normal: Vector3):
+	player.chosen_rotation_direction = Vector2(-normal.x, -normal.z);
 	
 func calculateMovementAxis():
 	horizontalMoveAxis = Vector3(wallNormal.z, 0, -wallNormal.x).normalized();
@@ -80,10 +90,28 @@ func physics_update(delta: float) -> void:
 	
 	var outset = wall_check[0]
 	var inset = wall_check[1]
-	var vault = wall_check[2]
+	var origin = wall_check[2]
 	
-	if !vault:
+	if outset:
+		var dist = origin.distance_squared_to(outset.position)
+		if(wallNormal != outset.normal):
+			altWallNormal = outset.normal;
+		updateRotation(lerp(wallNormal, altWallNormal, .5).normalized())
+		if dist > 2.3:
+			setWall(outset.normal)
+			return
+			
+	if inset:
+		var dist = origin.distance_squared_to(outset.position)
+		if(wallNormal != outset.normal):
+			altWallNormal = outset.normal;
+		updateRotation(lerp(wallNormal, altWallNormal, .5).normalized())
+		if dist > 2.3:
+			setWall(outset.normal)
+			return
+			
+	if(player.velocity.y > 0 and !outset):
 		state_machine.transition_to(Enums.STATE.Vault, {"direction": wallNormal})
 		return
 		
-	#if outset
+
