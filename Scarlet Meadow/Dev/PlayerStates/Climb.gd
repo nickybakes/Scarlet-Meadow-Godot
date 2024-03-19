@@ -11,10 +11,12 @@ var climbingDirection : Vector3
 var lastNonZeroClimbingInput := Vector2(1, 0)
 var forceClimbingInput : Vector2
 var forceClimbingTime : float
+var forceClimbingInset : bool
 var jumpSpeed : float
 var jumpDirection : Vector2
 var jumpCooldown : float
 var timeClimbing : float
+var previousPosition : Vector3;
 
 func _init():
 	gravity_enabled = false
@@ -23,6 +25,7 @@ func _init():
 	movement_mode = Enums.MOVEMENT_MODE.None
 	
 func enter(previousState : Enums.STATE, _msg := {}):
+	previousPosition = player.position;
 	forceClimbingTime = 0;
 	jumpCooldown = 0;
 	jumpSpeed = 0;
@@ -54,18 +57,18 @@ func setWall(normal: Vector3):
 	updateRotation(wallNormal)
 	calculateMovementAxis()
 
-func stickToWall():
+func stickToWall(force = 4):
 	#stick player to wall
-	player.velocity = wallNormal * -2;
+	player.velocity = wallNormal * -force;
 	for n in 4:
-		player.move_and_slide();
+		player.move_and_slide();	
 
 func updateRotation(normal: Vector3):
 	player.chosen_rotation_direction = Vector2(-normal.x, -normal.z);
 	
 func calculateMovementAxis():
 	horizontalMoveAxis = Vector3(wallNormal.z, 0, -wallNormal.x).normalized();
-	verticalMoveAxis = horizontalMoveAxis.cross(wallNormal);
+	verticalMoveAxis = horizontalMoveAxis.cross(wallNormal).normalized();
 	
 func moveAlongWall(direction: Vector2, speed: float):
 	climbingInput = direction;
@@ -80,6 +83,8 @@ func update(delta: float) -> void:
 	
 	if forceClimbingTime > 0:
 		forceClimbingTime -= delta
+		if(forceClimbingInset):
+			stickToWall(.8)
 		if(forceClimbingTime <= 0):
 			stickToWall()
 		moveAlongWall(forceClimbingInput, 6);
@@ -123,9 +128,10 @@ func physics_update(delta: float) -> void:
 	var inset = wall_check[1]
 	var origin = wall_check[2]
 	
-	if outset:
+	if forceClimbingTime <= 0 and outset and outset.normal != wallNormal:
 		var dist = origin.distance_squared_to(outset.position)
 		if dist > 1.4:
+			forceClimbingInset = false;			
 			forceClimbingInput = lastNonZeroClimbingInput
 			forceClimbingInput.y = 0;
 			var dot = abs(wallNormal.dot(outset.normal));
@@ -137,25 +143,23 @@ func physics_update(delta: float) -> void:
 				stickToWall()
 			return
 			
-	if inset:
-		var dot = wallNormal.dot(inset.normal);
-		print(dot)
-		if dot >= 0 and dot < 1:
-			print(inset.normal)		
-			var dist = origin.distance_squared_to(inset.position)
-			if dist < .5:
-				#forceClimbingInput = lastNonZeroClimbingInput
-				
-				#forceClimbingTime = max(.4 - abs(dot), 0) * .4
-				setWall(inset.normal)
-				stickToWall()			
-				#if(dot < .3):
-					#jumpSpeed = 0;
-				#else:
-					#stickToWall()
-				return
+	if forceClimbingTime <= 0 and inset and inset.normal != wallNormal:
+		var dist1 = inset.position.distance_squared_to(player.position);
+		var dist2 = (inset.position + inset.normal * .1).distance_squared_to(player.position + wallNormal * .1);
+		var dot = abs(wallNormal.dot(inset.normal));
+		if(dist1 > dist2):	
+			forceClimbingInset = true;
+			forceClimbingInput = lastNonZeroClimbingInput
+			print(dot)
+			forceClimbingTime = max(.5 - dot, .2) * .7
+			setWall(inset.normal)
+			if(dot < .5):
+				jumpSpeed = 0;
+			else:
+				stickToWall()
+			return
 
-	if((!outset or origin.distance_squared_to(outset.position) > 3) and !inset and climbingInput != Vector2.ZERO):
+	if(forceClimbingTime <= 0 and (!outset or origin.distance_squared_to(outset.position) > 3) and !inset and climbingInput != Vector2.ZERO):
 		if(climbingInput.y < -.5):
 			state_machine.transition_to(Enums.STATE.Vault, {"direction": wallNormal})
 		else:

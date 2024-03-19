@@ -245,7 +245,7 @@ func check_wall_interactions() -> Array:
 
 	return [bot, mid, top]
 
-var debug = [Vector3(0, 0, 0)];
+var debug = [Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0)];
 func raycast_climb(climbingDirection: Vector3, wallNormal: Vector3) -> Array:
 	var results = [0, 0, 0, 0]
 	var space = get_world_3d().direct_space_state
@@ -257,11 +257,14 @@ func raycast_climb(climbingDirection: Vector3, wallNormal: Vector3) -> Array:
 	var query = PhysicsRayQueryParameters3D.create(origin1, end1, 0b0011, [self])
 	query.collide_with_areas = false
 	query.hit_back_faces = false
+	debug[0] = query.from;
+	debug[1] = query.to;
 	results[0] = space.intersect_ray(query)
-	#query.from = centerOfPlayer + (climbingDirection * radius * .5) + (wallNormal * .5);
+	query.from = centerOfPlayer + (climbingDirection * radius * .5);
 	query.to = centerOfPlayer + (climbingDirection * radius * 1.7) + (wallNormal * -1);
 	#results[3] = query.from;
-	debug[0] = query.from;
+	debug[2] = query.from;
+	debug[3] = query.to;
 	results[1] = space.intersect_ray(query)
 	
 	for n in 2:
