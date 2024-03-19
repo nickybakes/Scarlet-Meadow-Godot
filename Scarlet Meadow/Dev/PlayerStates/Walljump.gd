@@ -12,7 +12,7 @@ func enter(previousState : Enums.STATE, _msg := {}):
 	direction = _msg["direction"]
 	player.requested_move_direction = direction
 	player.velocity = direction * player.current_speed()
-	player.do_jump()
+	player.do_jump(true)
 	pass
 
 func update(delta: float) -> void:
