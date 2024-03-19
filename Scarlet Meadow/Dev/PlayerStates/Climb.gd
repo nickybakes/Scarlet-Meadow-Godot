@@ -150,7 +150,6 @@ func physics_update(delta: float) -> void:
 		if(dist1 > dist2):	
 			forceClimbingInset = true;
 			forceClimbingInput = lastNonZeroClimbingInput
-			print(dot)
 			forceClimbingTime = max(.5 - dot, .2) * .7
 			setWall(inset.normal)
 			if(dot < .5):

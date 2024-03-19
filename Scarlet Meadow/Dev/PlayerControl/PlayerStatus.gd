@@ -245,6 +245,44 @@ func check_wall_interactions() -> Array:
 
 	return [bot, mid, top]
 
+func request_wall_interactions() -> Array:
+	var wall_check = check_wall_interactions()
+	var bot = wall_check[0]
+	var mid = wall_check[1]
+	var top = wall_check[2]
+	
+	var normal_to_use : Vector3
+	
+	var amount = 0
+	if(bot):
+		amount += 1
+		normal_to_use = bot.normal
+		
+	if(top):
+		amount += 1
+		normal_to_use = top.normal		
+		
+	if(mid):
+		amount += 1
+		normal_to_use = mid.normal
+		
+	#can climb, can vault, can jump
+	var results = [[false, null], [false, null], [false, null]];
+	
+	if input_buffer.is_action_just_pressed(Enums.INPUT.Interact):
+		if top:
+			results[0] = [true, top.normal.normalized()];
+	
+	if input_buffer.is_action_just_pressed(Enums.INPUT.Interact):
+		if !top and ((mid and bot) or (!mid and bot) or (mid and !bot)):
+			results[1] = [true, Vector3(normal_to_use.x, 0, normal_to_use.z).normalized()];
+	
+	if input_buffer.is_action_just_pressed(Enums.INPUT.Jump):
+		if(amount >= 2) and is_on_wall_only():
+			results[2] = [true, Vector3(normal_to_use.x, 0, normal_to_use.z).normalized()];
+	
+	return results;
+
 var debug = [Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0)];
 func raycast_climb(climbingDirection: Vector3, wallNormal: Vector3) -> Array:
 	var results = [0, 0, 0, 0]

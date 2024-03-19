@@ -8,7 +8,8 @@ enum STATE
 	SideFlip,
 	Walljump,
 	Vault,
-	Climb
+	Climb,
+	ClimbFromGround
 }
 
 enum INPUT

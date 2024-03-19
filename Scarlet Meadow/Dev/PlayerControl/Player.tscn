@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://bw6lm14mw5vy1"]
+[gd_scene load_steps=18 format=3 uid="uid://bw6lm14mw5vy1"]
 
 [ext_resource type="Script" path="res://Dev/PlayerControl/PlayerStatus.gd" id="1_kkatd"]
 [ext_resource type="Script" path="res://Dev/PlayerStates/StateMachine.gd" id="2_k8nsj"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://Dev/PlayerStates/Walljump.gd" id="8_wjfm8"]
 [ext_resource type="Script" path="res://Dev/PlayerStates/Vault.gd" id="9_0x02l"]
 [ext_resource type="Script" path="res://Dev/PlayerStates/Climb.gd" id="10_rlaay"]
+[ext_resource type="Script" path="res://Dev/PlayerStates/ClimbFromGround.gd" id="11_xqyf1"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_dgtxy"]
 
@@ -88,6 +89,9 @@ script = ExtResource("9_0x02l")
 
 [node name="Climb" type="Node" parent="StateMachine"]
 script = ExtResource("10_rlaay")
+
+[node name="ClimbFromGround" type="Node" parent="StateMachine"]
+script = ExtResource("11_xqyf1")
 
 [node name="CameraTwist" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.64689, 0)

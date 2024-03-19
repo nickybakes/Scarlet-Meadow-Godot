@@ -34,5 +34,14 @@ func physics_update(delta: float) -> void:
 		skid_cooldown = .5
 		state_machine.transition_to(Enums.STATE.Skid, {"direction": player_input})
 		return
+		
+	var wall_interact = player.request_wall_interactions()
+	if wall_interact[0][0] and player.time_grounded > .2:
+		state_machine.transition_to(Enums.STATE.ClimbFromGround, {"wallNormal": wall_interact[0][1]})
+		return
+	
+	if wall_interact[1][0] and player.time_grounded > .2:
+		state_machine.transition_to(Enums.STATE.Vault, {"direction": wall_interact[1][1]})
+		return
 
 	player.requested_move_direction = player_input

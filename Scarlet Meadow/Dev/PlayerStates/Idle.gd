@@ -25,6 +25,15 @@ func update(delta: float) -> void:
 	if not player.grounded:
 		state_machine.transition_to(Enums.STATE.JumpFall)
 		return
+		
+	var wall_interact = player.request_wall_interactions()
+	if wall_interact[0][0] and player.time_grounded > .2:
+		state_machine.transition_to(Enums.STATE.ClimbFromGround, {"wallNormal": wall_interact[0][1]})
+		return
+	
+	if wall_interact[1][0] and player.time_grounded > .2:
+		state_machine.transition_to(Enums.STATE.Vault, {"direction": wall_interact[1][1]})
+		return
 #	if not player.is_on_floor():
 #		state_machine.transition_to("Air")
 #		return
