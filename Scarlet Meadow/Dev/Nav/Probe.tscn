@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3 uid="uid://c82xnele0cnhl"]
+
+[ext_resource type="Script" path="res://Dev/Nav/Probe.gd" id="1_ed7wf"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_xt1h4"]
+radial_segments = 6
+rings = 4
+
+[node name="Probe" type="Node3D"]
+script = ExtResource("1_ed7wf")
+
+[node name="DisplayMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, 0, 0)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_xt1h4")
