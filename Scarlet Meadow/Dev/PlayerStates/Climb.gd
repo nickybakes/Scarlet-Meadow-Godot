@@ -84,7 +84,7 @@ func update(delta: float) -> void:
 	if forceClimbingTime > 0:
 		forceClimbingTime -= delta
 		if(forceClimbingInset):
-			stickToWall(.8)
+			stickToWall(1.8)
 		if(forceClimbingTime <= 0):
 			stickToWall()
 		moveAlongWall(forceClimbingInput, 6);
@@ -150,7 +150,7 @@ func physics_update(delta: float) -> void:
 		if(dist1 > dist2):	
 			forceClimbingInset = true;
 			forceClimbingInput = lastNonZeroClimbingInput
-			forceClimbingTime = max(.5 - dot, .2) * .7
+			forceClimbingTime = .4
 			setWall(inset.normal)
 			if(dot < .5):
 				jumpSpeed = 0;

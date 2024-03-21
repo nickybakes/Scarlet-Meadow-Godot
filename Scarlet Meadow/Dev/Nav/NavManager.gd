@@ -6,7 +6,7 @@ extends Node3D
 		boundaryMesh.visible = value;
 		showBoundary = value;
 @export_range(1, 3, .5) var voxelSize := 2.0
-@export_range(0, 8) var octTreeDepth := 3
+@export_range(1, 8) var octTreeDepth := 3
 @export var createNavOnPlay := false;
 @onready var boundaryMesh = $BoundaryMesh;
 
@@ -32,6 +32,9 @@ var boundsMin := Vector3.ZERO;
 var boundsMax := Vector3.ZERO;
 var navMesh;
 var currentStep := 0;
+var currentOctStep = [];
+var numOcts = 0;
+var currentCompletedOcts = 0;
 var creatingNavMesh := false;
 
 var octTreeVisualStep := 0;
@@ -115,15 +118,56 @@ func createNavMesh():
 			print("Splitting octants...");
 			currentStep += 1;
 		6:
+			currentCompletedOcts = 0;
 			mainOct = {};
 			#midPoint, childOcts, probes, depth, closestOctWithProbes
 			mainOct = createOct(position, boundsMin, boundsMax, 0);
 			for probe in probeData:
 				putProbeInOct(probe, mainOct)
 			
-			print(str(countOcts(0, mainOct)) + " octants created");
+			numOcts = 0;
+			countOcts(mainOct);
+			print(str(numOcts) + " octants created");
 			currentStep += 1;
 		7:
+			print("--------------");
+			print("Spawning octants and probes...");
+			currentCompletedOcts = 0;
+			currentOctStep = [0];
+			currentStep += 1;
+		8:
+			var currentOct = mainOct;
+			for i in currentOctStep.size():
+				currentOct = currentOct.children[currentOctStep[i]];
+			
+			while currentOct.children.size() > 1:
+				currentOctStep.push_back(0);
+				currentOct = currentOct.children[0];
+				
+				
+			for pro in currentOct.probes:
+				var probe = probeScene.instantiate();
+				navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
+				probe.owner = get_tree().edited_scene_root
+				probe.position = pro.pos;
+				
+			currentCompletedOcts += 1;			
+			
+			if(currentCompletedOcts == round(numOcts * .25)):
+				print("25% complete");
+			if(currentCompletedOcts == round(numOcts * .5)):
+				print("50% complete");
+			if(currentCompletedOcts == round(numOcts * .75)):
+				print("75% complete");
+			
+			currentOctStep[currentOctStep.size() - 1] += 1;			
+			while(currentOctStep.size() > 1 and currentOctStep[currentOctStep.size() - 1] > 7):
+				currentOctStep.resize(currentOctStep.size() - 1);
+				currentOctStep[currentOctStep.size() - 1] += 1;
+			
+			if(currentOctStep == [8]):
+				currentStep += 1;
+		9:
 			print("--------------");			
 			print("Nav Mesh created!")			
 			creatingNavMesh = false;
@@ -158,16 +202,16 @@ func spawnOctVisual(octtree, oct):
 	octVisual.position = oct.center;
 	octVisual.scale = abs(oct.boundsMax - oct.boundsMin);
 
-func countOcts(count, currentOct) -> int:
+func countOcts(currentOct):
 	for oct in currentOct.children:
-		count = countOcts(count, oct)
-	return count + 1;
+		countOcts(oct)
+	numOcts += 1;
 
 func putProbeInOct(probe, currentOct) -> bool:
 	if(isPointWithinBounds(probe.pos, currentOct.boundsMin, currentOct.boundsMax)):
-		if(currentOct.children.size() == 0 and currentOct.depth < octTreeDepth):
+		while(currentOct.children.size() == 0 and currentOct.depth < octTreeDepth):
 			subdivide(currentOct);
-		elif currentOct.depth < octTreeDepth:
+		if currentOct.depth < octTreeDepth:
 			for oct in currentOct.children:
 				if(putProbeInOct(probe, oct)):
 					return true;
@@ -232,10 +276,6 @@ func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions
 	
 	if(collided.size() > 0):
 		probeData.push_back({"pos": pos, "collisions": collided});
-		#probe = probeScene.instantiate();
-		#navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
-		#probe.owner = get_tree().edited_scene_root
-		#probe.position = pos;
 
 func deleteNavMesh():
 	var navMesh = get_node_or_null("../NavMesh");
