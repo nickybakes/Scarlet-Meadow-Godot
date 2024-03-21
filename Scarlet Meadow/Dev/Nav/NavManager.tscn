@@ -1,0 +1,15 @@
+[gd_scene load_steps=4 format=3 uid="uid://5vm80vhtmnwi"]
+
+[ext_resource type="Script" path="res://Dev/Nav/NavManager.gd" id="1_423fp"]
+[ext_resource type="Material" uid="uid://cdafap1wgl7np" path="res://Dev/Nav/M_NavBoundary_01.tres" id="2_3veof"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_0vw0y"]
+material = ExtResource("2_3veof")
+
+[node name="NavManager" type="Node3D"]
+script = ExtResource("1_423fp")
+mainOct = {}
+
+[node name="BoundaryMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(50, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0)
+mesh = SubResource("BoxMesh_0vw0y")
