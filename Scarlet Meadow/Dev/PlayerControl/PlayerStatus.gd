@@ -238,7 +238,7 @@ func check_wall_interactions() -> Array:
 	var bot = raycast_forward(0, ray_length)
 	var mid = raycast_forward(1, ray_length)
 	var top = raycast_forward(2, ray_length)
-	
+
 	bot = isWall(bot)
 	mid = isWall(mid)
 	top = isWall(top)

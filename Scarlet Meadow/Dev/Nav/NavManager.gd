@@ -24,6 +24,12 @@ extends Node3D
 	set(value):
 		showOctTree = createOctTreeVisual();
 		
+@export var probeDebugButton := false:
+	set(value):
+		var neighborCount = 0;
+		for i in probeList.size():
+			neighborCount += probeList[i].neighbors.size();
+		print(neighborCount);
 		
 var probeScene = preload("res://Dev/Nav/Probe.tscn");
 var octVisualScene = preload("res://Dev/Nav/OctVisual.tscn");
@@ -35,7 +41,9 @@ var navMesh;
 var currentStep := 0;
 var currentOctStep = [];
 var numOcts = 0;
+var numProbes = 0;
 var currentCompletedOcts = 0;
+var currentCompletedProbes = 0;
 var creatingNavMesh := false;
 
 var octTreeVisualStep := 0;
@@ -119,7 +127,8 @@ func createNavMesh():
 						detectProbe(space, query, probe, pos, x, y, z, collided, result, directions);
 				
 			currentStep += 1;
-			print(str(probeList.size()) + " probes detected");
+			numProbes = probeList.size();
+			print(str(numProbes) + " probes detected");
 		5:
 			print("--------------");
 			print("Splitting octants...");
@@ -135,7 +144,7 @@ func createNavMesh():
 			numOcts = 0;
 			countOcts(mainOct);
 			print(str(numOcts) + " octants created");
-			currentStep += 1;
+			currentStep = 9;
 		7:
 			print("--------------");
 			print("Spawning octants and probes...");
@@ -152,12 +161,12 @@ func createNavMesh():
 				currentOct = currentOct.children[0];
 				
 				
-			for pro in currentOct.probes:
-				var probe = probeScene.instantiate();
-				navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
-				probe.owner = get_tree().edited_scene_root
-				probe.position = pro.pos;
-				probe.setMat(pro.probeType, pro.collisions);
+			#for pro in currentOct.probes:
+				#var probe = probeScene.instantiate();
+				#navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
+				#probe.owner = get_tree().edited_scene_root
+				#probe.position = pro.pos;
+				#probe.setMat(pro.probeType, pro.collisions);
 				
 			currentCompletedOcts += 1;			
 			
@@ -177,10 +186,64 @@ func createNavMesh():
 				currentStep += 1;
 		9:
 			print("--------------");			
+			print("Linking probe neighbors...")
+			currentCompletedOcts = 0;
+			currentCompletedProbes = 0;
+			currentStep += 1;
+		10:
+			var probe = probeList[currentCompletedProbes];
+			
+			for x in range(-1, 1):
+				for y in range(-1, 1):
+					for z in range(-1, 1):
+						if(x == 0 and y == 0 and z == 0):
+							continue;
+						var neighbor = getPossibleProbeAtPoint(probe.pos + (Vector3(x, y, z) * voxelSize));
+						if(neighbor):
+							probe.neighbors.push_back(neighbor);
+			
+			currentCompletedProbes += 1;
+			if(currentCompletedProbes == round(numProbes * .25)):
+				print("25% complete");
+			if(currentCompletedProbes == round(numProbes * .5)):
+				print("50% complete");
+			if(currentCompletedProbes == round(numProbes * .75)):
+				print("75% complete");
+			
+			if(currentCompletedProbes == numProbes):
+				currentStep += 1;
+		_:
+			print("--------------");			
 			print("Nav Mesh created!")			
 			creatingNavMesh = false;
 			currentStep += 1;
 	
+
+func getPossibleProbeAtPoint(point : Vector3) -> Dictionary:
+	var oct = getOctFromPoint(point);
+	for probe in oct.probes:
+		if(probe.pos == point):
+			return probe;
+	return {};
+
+func getOctChildIndexFromPoint(point : Vector3, center : Vector3) -> int:
+	var index = 0;
+	if(point.x < center.x):
+		index += 4;
+	if(point.y < center.y):
+		index += 2;
+	if(point.z < center.z):
+		index += 1;
+	return index;
+		
+
+func getOctFromPoint(point : Vector3) -> Dictionary:
+	var currentOct = mainOct;
+	var childIndex = 0;
+	while(currentOct.children.size() != 0):
+		childIndex = getOctChildIndexFromPoint(point, currentOct.center);
+		currentOct = currentOct.children[childIndex];
+	return currentOct;
 
 func createOctTreeVisual() -> bool:
 	var octtree = get_node_or_null("../OctTreeVisual");
@@ -280,14 +343,14 @@ func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions
 	if(result and result.normal == Vector3.ZERO):
 		return;
 		
-	if(result):
+	if(result and result.normal.y > .625):
 		probeType = PROBETYPE.GROUND;
 		collided.push_back(result);
 		
 	for i in range(1, directions.size()):
 		query.to = pos + directions[i] * voxelSize;
 		result = space.intersect_ray(query)
-		if(result):
+		if(result and result.normal.y < .3 and result.normal.y > -.3):
 			if(probeType == PROBETYPE.GROUND):
 				probeType = PROBETYPE.CLIMBSTART;
 			else:
@@ -297,7 +360,7 @@ func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions
 			break;
 	
 	if(collided.size() > 0):
-		probeList.push_back({"pos": pos, "collisions": collided, "probeType": probeType});
+		probeList.push_back({"pos": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
 
 func deleteNavMesh():
 	var navMesh = get_node_or_null("../NavMesh");
