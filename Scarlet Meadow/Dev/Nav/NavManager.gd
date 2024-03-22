@@ -26,11 +26,16 @@ extends Node3D
 		
 @export var probeDebugButton := false:
 	set(value):
-		var neighborCount = 0;
-		for i in probeList.size():
-			if(probeList[i].neighbors.size() > neighborCount):
-				neighborCount = probeList[i].neighbors.size();
-		print(neighborCount);
+		var mostNeighbors = 0;
+		var index = 0;
+		for probe in probeList:
+			if(probe.neighbors.size() > mostNeighbors):
+				mostNeighbors = probe.neighbors.size();
+				index = probe.index;
+				
+		print(index);
+		print(mostNeighbors);
+		print(probeList[index]);
 		
 var probeScene = preload("res://Dev/Nav/Probe.tscn");
 var octVisualScene = preload("res://Dev/Nav/OctVisual.tscn");
@@ -102,11 +107,6 @@ func createNavMesh():
 			boundsMax = position + Vector3(scale.x * 25, scale.y * 25, scale.z * 25);
 			boundsMin = position + Vector3(scale.x * -25, scale.y * -25, scale.z * -25);
 			probeAmount = Vector3(abs(boundsMax - boundsMin)/voxelSize);
-	
-			navMesh = Node3D.new()
-			navMesh.set_name("NavMesh")
-			get_tree().edited_scene_root.add_child(navMesh, true);
-			navMesh.owner = get_tree().edited_scene_root;
 			
 			probeList = [];
 			
@@ -145,7 +145,7 @@ func createNavMesh():
 			numOcts = 0;
 			countOcts(mainOct);
 			print(str(numOcts) + " octants created");
-			currentStep += 1;
+			currentStep = 9;
 		7:
 			print("--------------");
 			print("Spawning octants and probes...");
@@ -188,31 +188,55 @@ func createNavMesh():
 		9:
 			print("--------------");			
 			print("Linking probe neighbors...")
-			currentCompletedOcts = 0;
 			currentCompletedProbes = 0;
 			currentStep += 1;
 		10:
-			var probe = probeList[currentCompletedProbes];
+			for i in 100:
+				var probe = probeList[currentCompletedProbes];
 			
-			for x in range(-1, 2):
-				for y in range(-1, 2):
-					for z in range(-1, 2):
-						if(x == 0 and y == 0 and z == 0):
-							continue;
-						var neighbor = getPossibleProbeAtPoint(probe.pos + (Vector3(x, y, z) * voxelSize));
-						if(neighbor != -1):
-							probe.neighbors.push_back(neighbor);
-			
-			currentCompletedProbes += 1;
-			if(currentCompletedProbes == round(numProbes * .25)):
-				print("25% complete");
-			if(currentCompletedProbes == round(numProbes * .5)):
-				print("50% complete");
-			if(currentCompletedProbes == round(numProbes * .75)):
-				print("75% complete");
-			
-			if(currentCompletedProbes == numProbes):
-				currentStep += 1;
+				for x in range(-1, 2):
+					for y in range(-1, 2):
+						for z in range(-1, 2):
+							if(x == 0 and y == 0 and z == 0):
+								continue;
+							var neighbor = getPossibleProbeAtPoint(probe.pos + (Vector3(x, y, z) * voxelSize));
+							if(neighbor != -1):
+								probe.neighbors.push_back(neighbor);
+				
+				currentCompletedProbes += 1;
+				if(currentCompletedProbes == round(numProbes * .25)):
+					print("25% complete");
+				if(currentCompletedProbes == round(numProbes * .5)):
+					print("50% complete");
+				if(currentCompletedProbes == round(numProbes * .75)):
+					print("75% complete");
+				
+				if(currentCompletedProbes == numProbes):
+					currentStep += 1;
+					break;
+		11:
+			print("--------------");			
+			print("Orienting probes for mesh...")
+			currentCompletedProbes = 0;
+			currentStep += 1;
+		12:
+			for i in 100:
+				currentCompletedProbes += 1;
+				if(currentCompletedProbes == round(numProbes * .25)):
+					print("25% complete");
+				if(currentCompletedProbes == round(numProbes * .5)):
+					print("50% complete");
+				if(currentCompletedProbes == round(numProbes * .75)):
+					print("75% complete");
+				
+				if(currentCompletedProbes == numProbes):
+					currentStep += 1;
+					break;
+		13:
+			print("--------------");			
+			print("Building viewable mesh...")
+			currentCompletedProbes = 0;
+			currentStep += 1;
 		_:
 			print("--------------");			
 			print("Nav Mesh created!")			
@@ -224,7 +248,7 @@ func getPossibleProbeAtPoint(point : Vector3) -> int:
 	var oct = getOctFromPoint(point);
 	for probe in oct.probes:
 		if(probe.pos == point):
-			return 1;
+			return probe.index;
 	return -1;
 
 func getOctChildIndexFromPoint(point : Vector3, center : Vector3) -> int:
@@ -361,16 +385,15 @@ func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions
 			break;
 	
 	if(collided.size() > 0):
-		probeList.push_back({"pos": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
+		probeList.push_back({"index": probeList.size(), "pos": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
 
 func deleteNavMesh():
-	var navMesh = get_node_or_null("../NavMesh");
-	if(navMesh == null):
+	if(probeList == [] and mainOct == {}):
 		print("No NavMesh to delete!");
 		return;
 	print("Deleting NavMesh...");
+	probeList = [];
 	mainOct = {};
-	navMesh.free();
 	print("NavMesh deleted!");
 	pass
 
