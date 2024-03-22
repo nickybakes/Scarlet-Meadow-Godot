@@ -1,0 +1,8 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://bib38tsiseki0"]
+
+[ext_resource type="Shader" path="res://Dev/Debug/S_DebugOnTop_01.gdshader" id="1_ts3or"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_ts3or")
+shader_parameter/color = Vector3(1, 1, 0)

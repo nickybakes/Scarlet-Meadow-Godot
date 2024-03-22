@@ -1,0 +1,7 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://w7o4whqhtboy"]
+
+[ext_resource type="Shader" path="res://Dev/Debug/S_DebugOnTop_01.gdshader" id="1_rl4ga"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_rl4ga")
