@@ -28,7 +28,8 @@ extends Node3D
 	set(value):
 		var neighborCount = 0;
 		for i in probeList.size():
-			neighborCount += probeList[i].neighbors.size();
+			if(probeList[i].neighbors.size() > neighborCount):
+				neighborCount = probeList[i].neighbors.size();
 		print(neighborCount);
 		
 var probeScene = preload("res://Dev/Nav/Probe.tscn");
@@ -144,7 +145,7 @@ func createNavMesh():
 			numOcts = 0;
 			countOcts(mainOct);
 			print(str(numOcts) + " octants created");
-			currentStep = 9;
+			currentStep += 1;
 		7:
 			print("--------------");
 			print("Spawning octants and probes...");
@@ -161,12 +162,12 @@ func createNavMesh():
 				currentOct = currentOct.children[0];
 				
 				
-			#for pro in currentOct.probes:
-				#var probe = probeScene.instantiate();
-				#navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
-				#probe.owner = get_tree().edited_scene_root
-				#probe.position = pro.pos;
-				#probe.setMat(pro.probeType, pro.collisions);
+			for pro in currentOct.probes:
+				var probe = probeScene.instantiate();
+				navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
+				probe.owner = get_tree().edited_scene_root
+				probe.position = pro.pos;
+				probe.setMat(pro.probeType, pro.collisions);
 				
 			currentCompletedOcts += 1;			
 			
@@ -193,13 +194,13 @@ func createNavMesh():
 		10:
 			var probe = probeList[currentCompletedProbes];
 			
-			for x in range(-1, 1):
-				for y in range(-1, 1):
-					for z in range(-1, 1):
+			for x in range(-1, 2):
+				for y in range(-1, 2):
+					for z in range(-1, 2):
 						if(x == 0 and y == 0 and z == 0):
 							continue;
 						var neighbor = getPossibleProbeAtPoint(probe.pos + (Vector3(x, y, z) * voxelSize));
-						if(neighbor):
+						if(neighbor != -1):
 							probe.neighbors.push_back(neighbor);
 			
 			currentCompletedProbes += 1;
@@ -219,12 +220,12 @@ func createNavMesh():
 			currentStep += 1;
 	
 
-func getPossibleProbeAtPoint(point : Vector3) -> Dictionary:
+func getPossibleProbeAtPoint(point : Vector3) -> int:
 	var oct = getOctFromPoint(point);
 	for probe in oct.probes:
 		if(probe.pos == point):
-			return probe;
-	return {};
+			return 1;
+	return -1;
 
 func getOctChildIndexFromPoint(point : Vector3, center : Vector3) -> int:
 	var index = 0;
