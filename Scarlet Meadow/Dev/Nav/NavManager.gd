@@ -6,7 +6,7 @@ extends Node3D
 		boundaryMesh.visible = value;
 		showBoundary = value;
 @export_range(1, 3, .5) var voxelSize := 2.0
-@export_range(1, 8) var octTreeDepth := 3
+@export_range(1, 8) var octreeDepth := 3
 @export var createNavOnPlay := false;
 @onready var boundaryMesh = $BoundaryMesh;
 
@@ -20,25 +20,30 @@ extends Node3D
 	set(value):
 		deleteNavMesh();
 		
-@export var showOctTree := false:
+@export var CreateOctreeVisual := false:
 	set(value):
-		showOctTree = createOctTreeVisual();
+		createOctreeVisual();
+		
+@export var DeleteOctreeVisual := false:
+	set(value):
+		deleteOctreeVisual();
 		
 @export var probeDebugButton := false:
 	set(value):
-		var mostNeighbors = 0;
-		var index = 0;
-		for probe in probeList:
-			if(probe.neighbors.size() > mostNeighbors):
-				mostNeighbors = probe.neighbors.size();
-				index = probe.index;
-				
-		print(index);
-		print(mostNeighbors);
-		print(probeList[index]);
+		#var mostNeighbors = 0;
+		#var index = 0;
+		#for probe in probeList:
+			#if(probe.neighbors.size() > mostNeighbors):
+				#mostNeighbors = probe.neighbors.size();
+				#index = probe.index;
+				#
+		#print(index);
+		#print(mostNeighbors);
+		#print(probeList[index]);
+		print(probeList[0]);
 		
-var probeScene = preload("res://Dev/Nav/Probe.tscn");
-var octVisualScene = preload("res://Dev/Nav/OctVisual.tscn");
+var navMeshMaterial = preload("res://Dev/Nav/M_NavMesh_01.tres");
+var octreeVisualMaterial = preload("res://Dev/Nav/M_NavBoundary_01.tres");
 
 var probeAmount := Vector3.ZERO;
 var boundsMin := Vector3.ZERO;
@@ -52,9 +57,6 @@ var currentCompletedOcts = 0;
 var currentCompletedProbes = 0;
 var creatingNavMesh := false;
 
-var octTreeVisualStep := 0;
-var creatingOctTreeVisual := false;
-
 var probeList;
 
 var mainOct;
@@ -65,9 +67,9 @@ func _get_property_list():
 	var properties = []
 	
 	properties.append({
-	"name": "probeList",
-	"type": TYPE_ARRAY,
-	"usage": PROPERTY_USAGE_STORAGE,
+		"name": "probeList",
+		"type": TYPE_ARRAY,
+		"usage": PROPERTY_USAGE_STORAGE,
 	})
 	
 	properties.append({
@@ -92,16 +94,16 @@ func createNavMesh():
 	match(currentStep):
 		0:
 			print();
-			print("--------------");
-			print("Creating Nav Mesh...");
-			print("Checking for and deleting previous probes...");
+			print("************");
+			print("Creating nav mesh...");
+			print("Checking for and deleting previous nav mesh...");
 			currentStep += 1;
 		1:
 			deleteNavMesh();
 			currentStep += 1;
 		2:
 			print("--------------");
-			print("Detecting probes...");
+			print("Creating probes...");
 			currentStep += 1;
 		3:
 			boundsMax = position + Vector3(scale.x * 25, scale.y * 25, scale.z * 25);
@@ -125,130 +127,181 @@ func createNavMesh():
 			for x in probeAmount.x:
 				for y in probeAmount.y:
 					for z in probeAmount.z:
-						detectProbe(space, query, probe, pos, x, y, z, collided, result, directions);
+						createProbe(space, query, probe, pos, x, y, z, collided, result, directions);
 				
 			currentStep += 1;
 			numProbes = probeList.size();
-			print(str(numProbes) + " probes detected");
+			print(str(numProbes) + " probes created");
 		5:
-			print("--------------");
-			print("Splitting octants...");
+			print("Creating temporary octree...");
 			currentStep += 1;
 		6:
-			currentCompletedOcts = 0;
-			mainOct = {};
-			#midPoint, childOcts, probes, depth, closestOctWithProbes
-			mainOct = createOct(position, boundsMin, boundsMax, 0);
-			for probe in probeList:
-				putProbeInOct(probe, mainOct)
-			
-			numOcts = 0;
-			countOcts(mainOct);
-			print(str(numOcts) + " octants created");
-			currentStep = 9;
-		7:
-			print("--------------");
-			print("Spawning octants and probes...");
-			currentCompletedOcts = 0;
-			currentOctStep = [0];
+			createOctree();
 			currentStep += 1;
-		8:
-			var currentOct = mainOct;
-			for i in currentOctStep.size():
-				currentOct = currentOct.children[currentOctStep[i]];
-			
-			while currentOct.children.size() > 1:
-				currentOctStep.push_back(0);
-				currentOct = currentOct.children[0];
-				
-				
-			for pro in currentOct.probes:
-				var probe = probeScene.instantiate();
-				navMesh.add_child(probe, true, Node.INTERNAL_MODE_BACK);
-				probe.owner = get_tree().edited_scene_root
-				probe.position = pro.pos;
-				probe.setMat(pro.probeType, pro.collisions);
-				
-			currentCompletedOcts += 1;			
-			
-			if(currentCompletedOcts == round(numOcts * .25)):
-				print("25% complete");
-			if(currentCompletedOcts == round(numOcts * .5)):
-				print("50% complete");
-			if(currentCompletedOcts == round(numOcts * .75)):
-				print("75% complete");
-			
-			currentOctStep[currentOctStep.size() - 1] += 1;			
-			while(currentOctStep.size() > 1 and currentOctStep[currentOctStep.size() - 1] > 7):
-				currentOctStep.resize(currentOctStep.size() - 1);
-				currentOctStep[currentOctStep.size() - 1] += 1;
-			
-			if(currentOctStep == [8]):
-				currentStep += 1;
-		9:
-			print("--------------");			
+		7:
 			print("Linking probe neighbors...")
 			currentCompletedProbes = 0;
 			currentStep += 1;
-		10:
-			for i in 100:
-				var probe = probeList[currentCompletedProbes];
-			
+		8:
+			for probe in probeList:
 				for x in range(-1, 2):
 					for y in range(-1, 2):
 						for z in range(-1, 2):
 							if(x == 0 and y == 0 and z == 0):
 								continue;
-							var neighbor = getPossibleProbeAtPoint(probe.pos + (Vector3(x, y, z) * voxelSize));
+							var neighbor = getPossibleProbeAtPoint(probe.position + (Vector3(x, y, z) * voxelSize));
 							if(neighbor != -1):
 								probe.neighbors.push_back(neighbor);
-				
-				currentCompletedProbes += 1;
-				if(currentCompletedProbes == round(numProbes * .25)):
-					print("25% complete");
-				if(currentCompletedProbes == round(numProbes * .5)):
-					print("50% complete");
-				if(currentCompletedProbes == round(numProbes * .75)):
-					print("75% complete");
-				
-				if(currentCompletedProbes == numProbes):
-					currentStep += 1;
-					break;
-		11:
-			print("--------------");			
-			print("Orienting probes for mesh...")
+			currentStep += 1;
+		9:
+			print("Building mesh...")
 			currentCompletedProbes = 0;
+			currentStep += 1;
+		10:
+			for probe in probeList:
+				
+				#check if this is at the top of a wall and should be a VAULT type probe
+				if(probe.probeType == PROBETYPE.WALL):
+					for neighborIndex in probe.neighbors:
+						var neighbor = probeList[neighborIndex];
+						if(neighbor.probeType == PROBETYPE.GROUND or neighbor.probeType == PROBETYPE.CLIMBSTART):
+							if(probe.position.y < neighbor.position.y):
+								var dist1 = (probe.collisions[0].position).distance_squared_to(neighbor.collisions[0].position)
+								var dist2 = (probe.collisions[0].position + (probe.collisions[0].normal * .2)).distance_squared_to(neighbor.collisions[0].position + (neighbor.collisions[0].normal * .2))
+								if(dist1 < dist2):
+									probe.probeType = PROBETYPE.VAULT;
+									break;
+								
+				#based on the probe type, determine its orientation and neighbors' relation to that
+				var orientatedNeighbors = {};
+				match(probe.probeType):
+					PROBETYPE.GROUND, PROBETYPE.CLIMBSTART:
+						orientatedNeighbors = getOrientatedNeighbors(probe.position, probe.neighbors, Vector3(1, 0, 0),  Vector3(0, 0, 1));
+						probe.rightNeighbor = orientatedNeighbors.rightNeighbor;
+						probe.downNeighbor = orientatedNeighbors.downNeighbor;
+						probe.leftNeighbor = orientatedNeighbors.leftNeighbor;
+						probe.upNeighbor = orientatedNeighbors.upNeighbor;
+					PROBETYPE.WALL or PROBETYPE.VAULT:
+						pass
+				
+				#if(probe.probeType == PROBETYPE.GROUND):
+					#rightVector = Vector3(probe.normal.z, 0, -wallNormal.x).normalized();
+					#upVector = horizontalMoveAxis.cross(wallNormal).normalized();
+			currentStep += 1;
+		11:
+			print("Shrinkwrapping probes and creating final octree...");
+			for probe in probeList:
+				probe.position = probe.collisions[0].position + (probe.collisions[0].normal * .3);
 			currentStep += 1;
 		12:
-			for i in 100:
-				currentCompletedProbes += 1;
-				if(currentCompletedProbes == round(numProbes * .25)):
-					print("25% complete");
-				if(currentCompletedProbes == round(numProbes * .5)):
-					print("50% complete");
-				if(currentCompletedProbes == round(numProbes * .75)):
-					print("75% complete");
-				
-				if(currentCompletedProbes == numProbes):
-					currentStep += 1;
-					break;
+			createOctree();
+			#for empty leaf octs (octs at the end of a brand who have no more children),
+			#find the closest probe to them so if we try to find a probe in this empty oct
+			#we can just get this closest probe as an approximation
+			for child in mainOct.children:
+				setClosestProbeToEmptyOcts(child);
+			currentStep += 1;
 		13:
-			print("--------------");			
-			print("Building viewable mesh...")
-			currentCompletedProbes = 0;
+			print("Finalizing mesh...");
+			currentStep += 1;
+		14:
+			var oldMesh = get_node_or_null("../NavMeshVisualizer");
+			if(oldMesh != null):
+				oldMesh.free();
+				
+			var st = SurfaceTool.new();
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			
+			for probe in probeList:
+				if(probe.rightNeighbor != -1 and probe.downNeighbor != -1):
+					st.set_color(getVertexColor(probe.probeType));
+					st.add_vertex(probe.position);
+					st.set_color(getVertexColor(probeList[probe.rightNeighbor].probeType));
+					st.add_vertex(probeList[probe.rightNeighbor].position);
+					st.set_color(getVertexColor(probeList[probe.downNeighbor].probeType));
+					st.add_vertex(probeList[probe.downNeighbor].position);
+				if(probe.leftNeighbor != -1 and probe.upNeighbor != -1):
+					st.set_color(getVertexColor(probe.probeType));
+					st.add_vertex(probe.position);
+					st.set_color(getVertexColor(probeList[probe.leftNeighbor].probeType));
+					st.add_vertex(probeList[probe.leftNeighbor].position);
+					st.set_color(getVertexColor(probeList[probe.upNeighbor].probeType));
+					st.add_vertex(probeList[probe.upNeighbor].position);
+
+			var arrayMesh = st.commit();
+			var visualMesh = MeshInstance3D.new()
+			visualMesh.set_name("NavMeshVisualizer")
+			visualMesh.mesh = arrayMesh;
+			visualMesh.set_surface_override_material(0, navMeshMaterial);
+			visualMesh.set_cast_shadows_setting(GeometryInstance3D.SHADOW_CASTING_SETTING_OFF);
+			get_tree().edited_scene_root.add_child(visualMesh, true);
+			visualMesh.owner = get_tree().edited_scene_root;
 			currentStep += 1;
 		_:
-			print("--------------");			
-			print("Nav Mesh created!")			
+			print("~~~~~~~~~~~~~~");			
+			print("Nav mesh created!")			
 			creatingNavMesh = false;
 			currentStep += 1;
 	
 
+func getVertexColor(probeType : PROBETYPE) -> Color:
+	var color = Color(0, 0, 0);
+	match(probeType):
+		PROBETYPE.GROUND:
+			color = Color(0, 0.4, 0);
+		PROBETYPE.WALL:
+			color = Color(0, 0.0, 1);
+		PROBETYPE.VAULT:
+			color = Color(1, 0.8, 0);
+		PROBETYPE.CLIMBSTART:
+			color = Color(1, 0.0, 0);
+	return color;
+
+func getNeighborClosestToOrientation(pos : Vector3, neighbors : Array, axis : Vector3, usedNeighbors : Array) -> int:
+	var result = -1;
+	var highestDot = -1;
+	for neighborIndex in neighbors:
+		var neighbor = probeList[neighborIndex];
+		var dot = axis.dot((neighbor.position - pos).normalized());
+		if(dot > .6):
+			if(dot > highestDot and !usedNeighbors.has(neighborIndex)):
+				result = neighborIndex
+				highestDot = dot;
+	return result;
+
+func getOrientatedNeighbors(pos : Vector3, neighbors : Array, rightAxis : Vector3, downAxis : Vector3) -> Dictionary:
+	var orientatedNeighbors = {"rightNeighbor": -1, "downNeighbor": -1, "leftNeighbor": -1, "upNeighbor": -1};
+	var usedNeighbors = [];
+	orientatedNeighbors.rightNeighbor = getNeighborClosestToOrientation(pos, neighbors, rightAxis, usedNeighbors);
+	usedNeighbors.push_back(orientatedNeighbors.rightNeighbor);
+		
+	orientatedNeighbors.downNeighbor = getNeighborClosestToOrientation(pos, neighbors, downAxis, usedNeighbors);
+	usedNeighbors.push_back(orientatedNeighbors.downNeighbor);
+	
+	orientatedNeighbors.leftNeighbor = getNeighborClosestToOrientation(pos, neighbors, -rightAxis, usedNeighbors);
+	usedNeighbors.push_back(orientatedNeighbors.leftNeighbor);
+	
+	orientatedNeighbors.upNeighbor = getNeighborClosestToOrientation(pos, neighbors, -downAxis, usedNeighbors);
+	
+	return orientatedNeighbors;
+
+func setClosestProbeToEmptyOcts(oct : Dictionary):
+	if oct.children.size() > 0:
+		for child in oct.children:
+			setClosestProbeToEmptyOcts(child);
+	elif oct.probes.size() == 0:
+		var closestDistanceSquared = 1.79769e308;
+		for probe in probeList:
+			var dist = oct.center.distance_squared_to(probe.position);
+			if(dist < closestDistanceSquared):
+				oct.closestProbeIfEmpty = probe.index;
+				closestDistanceSquared = dist;
+
 func getPossibleProbeAtPoint(point : Vector3) -> int:
 	var oct = getOctFromPoint(point);
 	for probe in oct.probes:
-		if(probe.pos == point):
-			return probe.index;
+		if(probeList[probe].position == point):
+			return probe;
 	return -1;
 
 func getOctChildIndexFromPoint(point : Vector3, center : Vector3) -> int:
@@ -270,33 +323,69 @@ func getOctFromPoint(point : Vector3) -> Dictionary:
 		currentOct = currentOct.children[childIndex];
 	return currentOct;
 
-func createOctTreeVisual() -> bool:
-	var octtree = get_node_or_null("../OctTreeVisual");
-	if(!creatingOctTreeVisual):
-		if(octtree != null):
-			octtree.free();
-			return false;
-		if(mainOct == {}):
-			return false;
-		octtree = Node3D.new()
-		octtree.set_name("OctTreeVisual")
-		get_tree().edited_scene_root.add_child(octtree, true);
-		octtree.owner = get_tree().edited_scene_root;
-		creatingOctTreeVisual = true;
-	else:
-		creatingOctTreeVisual = false;
-		for oct in mainOct.children:
-			spawnOctVisual(octtree, oct);
-	return true;
+func createOctreeVisual():
+	if(mainOct == {}):
+		print("No octree made yet! Create a nav mesh first!")
+		return;
 	
-func spawnOctVisual(octtree, oct):
-	for oct2 in oct.children:
-		spawnOctVisual(octtree, oct2);
-	var octVisual = octVisualScene.instantiate();
-	octtree.add_child(octVisual, true, Node.INTERNAL_MODE_BACK);
-	octVisual.owner = get_tree().edited_scene_root
-	octVisual.position = oct.center;
-	octVisual.scale = abs(oct.boundsMax - oct.boundsMin);
+	var oldMesh = get_node_or_null("../OctreeVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+		
+	var st = SurfaceTool.new();
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	for oct in mainOct.children:
+		addOctreeVisualVertices(st, oct);
+	
+	var arrayMesh = st.commit();
+	var visualMesh = MeshInstance3D.new()
+	visualMesh.set_name("OctreeVisualizer")
+	visualMesh.mesh = arrayMesh;
+	visualMesh.set_surface_override_material(0, octreeVisualMaterial);
+	visualMesh.set_cast_shadows_setting(GeometryInstance3D.SHADOW_CASTING_SETTING_OFF);
+	get_tree().edited_scene_root.add_child(visualMesh, true);
+	visualMesh.owner = get_tree().edited_scene_root;
+
+	
+func addOctreeVisualVertices(st : SurfaceTool, oct : Dictionary):
+	for child in oct.children:
+		addOctreeVisualVertices(st, child);
+	var x = oct.boundsMin.x;
+	var y = oct.boundsMin.y;
+	var z = oct.boundsMin.z;
+	var x2 = oct.boundsMax.x;
+	var y2 = oct.boundsMax.y;
+	var z2 = oct.boundsMax.z;
+	
+	addQuad(st, [Vector3(x,y,z), Vector3(x2,y,z), Vector3(x2,y2,z), Vector3(x,y2,z)], Vector3.FORWARD);
+	addQuad(st, [Vector3(x2,y,z), Vector3(x2,y,z2), Vector3(x2,y2,z2), Vector3(x2,y2,z)], Vector3.RIGHT);
+	addQuad(st, [Vector3(x2,y,z2), Vector3(x,y,z2), Vector3(x,y2,z2), Vector3(x2,y2,z2)], Vector3.BACK);
+	addQuad(st, [Vector3(x,y,z2), Vector3(x,y,z), Vector3(x,y2,z), Vector3(x,y2,z2)], Vector3.LEFT);
+	addQuad(st, [Vector3(x,y2,z), Vector3(x2,y2,z), Vector3(x2,y2,z2), Vector3(x,y2,z2)], Vector3.UP);
+	addQuad(st, [Vector3(x2,y,z2), Vector3(x2,y,z), Vector3(x,y,z), Vector3(x,y,z2)], Vector3.DOWN);
+	
+func addQuad(st : SurfaceTool, vertices : Array, normal : Vector3):
+	st.set_normal(normal);
+	st.add_vertex(vertices[0]);
+	st.set_normal(normal);
+	st.add_vertex(vertices[1]);
+	st.set_normal(normal);
+	st.add_vertex(vertices[3]);
+	st.set_normal(normal);
+	st.add_vertex(vertices[3]);
+	st.set_normal(normal);
+	st.add_vertex(vertices[1]);
+	st.set_normal(normal);
+	st.add_vertex(vertices[2]);
+
+func deleteOctreeVisual():
+	var oldMesh = get_node_or_null("../OctreeVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+		print("Octree visual deleted!");
+	else:
+		print("No octree visual to delete!");
 
 func countOcts(currentOct):
 	for oct in currentOct.children:
@@ -304,15 +393,15 @@ func countOcts(currentOct):
 	numOcts += 1;
 
 func putProbeInOct(probe, currentOct) -> bool:
-	if(isPointWithinBounds(probe.pos, currentOct.boundsMin, currentOct.boundsMax)):
-		while(currentOct.children.size() == 0 and currentOct.depth < octTreeDepth):
+	if(isPointWithinBounds(probe.position, currentOct.boundsMin, currentOct.boundsMax)):
+		while(currentOct.children.size() == 0 and currentOct.depth < octreeDepth):
 			subdivide(currentOct);
-		if currentOct.depth < octTreeDepth:
+		if currentOct.depth < octreeDepth:
 			for oct in currentOct.children:
 				if(putProbeInOct(probe, oct)):
 					return true;
 		else:
-			currentOct.probes.push_back(probe);
+			currentOct.probes.push_back(probe.index);
 			return true;
 	return false;
 			
@@ -338,7 +427,18 @@ func createOctSize(center : Vector3, size : Vector3, depth : int) -> Dictionary:
 	return createOct(center, bMin, bMax, depth);
 
 func createOct(center : Vector3, bMin : Vector3, bMax : Vector3, depth : int) -> Dictionary:
-	return {"center": center, "boundsMin": bMin, "boundsMax": bMax, "children": [], "probes": [], "depth": depth, "closestOctWithProbes": null}
+	return {"center": center, "boundsMin": bMin, "boundsMax": bMax, "children": [], "probes": [], "depth": depth, "closestProbeIfEmpty": -1}
+
+func createOctree():
+	currentCompletedOcts = 0;
+	mainOct = {};
+	mainOct = createOct(position, boundsMin, boundsMax, 0);
+	for probe in probeList:
+		putProbeInOct(probe, mainOct)
+	
+	numOcts = 0;
+	countOcts(mainOct);
+	print(str(numOcts) + " octants created");
 
 func isPointWithinBounds(point : Vector3, bMin : Vector3, bMax : Vector3) -> bool:
 	if(point.x < bMin.x or point.x > bMax.x):
@@ -357,7 +457,7 @@ enum PROBETYPE {
 	NONE
 }
 
-func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions):
+func createProbe(space, query, probe, pos, x, y, z, collided, result, directions):
 	var probeType = PROBETYPE.NONE;
 	pos = boundsMin + (Vector3(x, y, z) * voxelSize);
 	collided = [];
@@ -385,22 +485,22 @@ func detectProbe(space, query, probe, pos, x, y, z, collided, result, directions
 			break;
 	
 	if(collided.size() > 0):
-		probeList.push_back({"index": probeList.size(), "pos": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
+		probeList.push_back({"index": probeList.size(), "position": pos, "collisions": collided, "probeType": probeType, "neighbors": [], "rightNeighbor": -1, "downNeighbor": -1, "leftNeighbor": -1, "upNeighbor": -1});
 
 func deleteNavMesh():
 	if(probeList == [] and mainOct == {}):
-		print("No NavMesh to delete!");
+		print("No nav mesh to delete!");
 		return;
-	print("Deleting NavMesh...");
 	probeList = [];
 	mainOct = {};
-	print("NavMesh deleted!");
+	var oldMesh = get_node_or_null("../NavMeshVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+	print("Nav mesh deleted!");
 	pass
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
 	if(creatingNavMesh):
 		createNavMesh();
-	if(creatingOctTreeVisual):
-		createOctTreeVisual();
 	pass
