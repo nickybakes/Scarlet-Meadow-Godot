@@ -154,12 +154,7 @@ func createNavMesh():
 								probe.neighbors.push_back(neighbor);
 			currentStep += 1;
 		9:
-			print("Building mesh...")
-			currentCompletedProbes = 0;
-			currentStep += 1;
-		10:
 			for probe in probeList:
-				
 				#check if this is at the top of a wall and should be a VAULT type probe
 				if(probe.probeType == PROBETYPE.WALL):
 					for neighborIndex in probe.neighbors:
@@ -171,29 +166,13 @@ func createNavMesh():
 								if(dist1 < dist2):
 									probe.probeType = PROBETYPE.VAULT;
 									break;
-								
-				#based on the probe type, determine its orientation and neighbors' relation to that
-				var orientatedNeighbors = {};
-				match(probe.probeType):
-					PROBETYPE.GROUND, PROBETYPE.CLIMBSTART:
-						orientatedNeighbors = getOrientatedNeighbors(probe.position, probe.neighbors, Vector3(1, 0, 0),  Vector3(0, 0, 1));
-						probe.rightNeighbor = orientatedNeighbors.rightNeighbor;
-						probe.downNeighbor = orientatedNeighbors.downNeighbor;
-						probe.leftNeighbor = orientatedNeighbors.leftNeighbor;
-						probe.upNeighbor = orientatedNeighbors.upNeighbor;
-					PROBETYPE.WALL or PROBETYPE.VAULT:
-						pass
-				
-				#if(probe.probeType == PROBETYPE.GROUND):
-					#rightVector = Vector3(probe.normal.z, 0, -wallNormal.x).normalized();
-					#upVector = horizontalMoveAxis.cross(wallNormal).normalized();
 			currentStep += 1;
-		11:
+		10:
 			print("Shrinkwrapping probes and creating final octree...");
 			for probe in probeList:
-				probe.position = probe.collisions[0].position + (probe.collisions[0].normal * .3);
+				probe.position = lerp(probe.position, probe.collisions[0].position, .5)
 			currentStep += 1;
-		12:
+		11:
 			createOctree();
 			#for empty leaf octs (octs at the end of a brand who have no more children),
 			#find the closest probe to them so if we try to find a probe in this empty oct
@@ -201,32 +180,21 @@ func createNavMesh():
 			for child in mainOct.children:
 				setClosestProbeToEmptyOcts(child);
 			currentStep += 1;
-		13:
+		12:
 			print("Finalizing mesh...");
 			currentStep += 1;
-		14:
+		13:
 			var oldMesh = get_node_or_null("../NavMeshVisualizer");
 			if(oldMesh != null):
 				oldMesh.free();
 				
 			var st = SurfaceTool.new();
 			st.begin(Mesh.PRIMITIVE_TRIANGLES)
-			
+			var size = .3;
 			for probe in probeList:
-				if(probe.rightNeighbor != -1 and probe.downNeighbor != -1):
-					st.set_color(getVertexColor(probe.probeType));
-					st.add_vertex(probe.position);
-					st.set_color(getVertexColor(probeList[probe.rightNeighbor].probeType));
-					st.add_vertex(probeList[probe.rightNeighbor].position);
-					st.set_color(getVertexColor(probeList[probe.downNeighbor].probeType));
-					st.add_vertex(probeList[probe.downNeighbor].position);
-				if(probe.leftNeighbor != -1 and probe.upNeighbor != -1):
-					st.set_color(getVertexColor(probe.probeType));
-					st.add_vertex(probe.position);
-					st.set_color(getVertexColor(probeList[probe.leftNeighbor].probeType));
-					st.add_vertex(probeList[probe.leftNeighbor].position);
-					st.set_color(getVertexColor(probeList[probe.upNeighbor].probeType));
-					st.add_vertex(probeList[probe.upNeighbor].position);
+				addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], getVertexColor(probe.probeType));
+				addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], getVertexColor(probe.probeType));
+				addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], getVertexColor(probe.probeType));
 
 			var arrayMesh = st.commit();
 			var visualMesh = MeshInstance3D.new()
@@ -257,33 +225,34 @@ func getVertexColor(probeType : PROBETYPE) -> Color:
 			color = Color(1, 0.0, 0);
 	return color;
 
-func getNeighborClosestToOrientation(pos : Vector3, neighbors : Array, axis : Vector3, usedNeighbors : Array) -> int:
+func getNeighborClosestToOrientation(probe: Dictionary, axis : Vector3, usedNeighbors : Array) -> int:
 	var result = -1;
 	var highestDot = -1;
-	for neighborIndex in neighbors:
+	for neighborIndex in probe.neighbors:
 		var neighbor = probeList[neighborIndex];
-		var dot = axis.dot((neighbor.position - pos).normalized());
+		var dot = axis.dot((neighbor.position - probe.position).normalized());
 		if(dot > .6):
 			if(dot > highestDot and !usedNeighbors.has(neighborIndex)):
 				result = neighborIndex
 				highestDot = dot;
 	return result;
 
-func getOrientatedNeighbors(pos : Vector3, neighbors : Array, rightAxis : Vector3, downAxis : Vector3) -> Dictionary:
-	var orientatedNeighbors = {"rightNeighbor": -1, "downNeighbor": -1, "leftNeighbor": -1, "upNeighbor": -1};
+func getOrientatedNeighbors(probe: Dictionary, rightAxis : Vector3, downAxis : Vector3):
 	var usedNeighbors = [];
-	orientatedNeighbors.rightNeighbor = getNeighborClosestToOrientation(pos, neighbors, rightAxis, usedNeighbors);
-	usedNeighbors.push_back(orientatedNeighbors.rightNeighbor);
-		
-	orientatedNeighbors.downNeighbor = getNeighborClosestToOrientation(pos, neighbors, downAxis, usedNeighbors);
-	usedNeighbors.push_back(orientatedNeighbors.downNeighbor);
+	if(probe.rightNeighbor == -1):
+		probe.rightNeighbor = getNeighborClosestToOrientation(probe, rightAxis, usedNeighbors);
+		usedNeighbors.push_back(probe.rightNeighbor);
 	
-	orientatedNeighbors.leftNeighbor = getNeighborClosestToOrientation(pos, neighbors, -rightAxis, usedNeighbors);
-	usedNeighbors.push_back(orientatedNeighbors.leftNeighbor);
+	if(probe.downNeighbor == -1):
+		probe.downNeighbor = getNeighborClosestToOrientation(probe, downAxis, usedNeighbors);
+		usedNeighbors.push_back(probe.downNeighbor);
 	
-	orientatedNeighbors.upNeighbor = getNeighborClosestToOrientation(pos, neighbors, -downAxis, usedNeighbors);
+	if(probe.leftNeighbor == -1):
+		probe.leftNeighbor = getNeighborClosestToOrientation(probe, -rightAxis, usedNeighbors);
+		usedNeighbors.push_back(probe.leftNeighbor);
 	
-	return orientatedNeighbors;
+	if(probe.upNeighbor == -1):
+		probe.upNeighbor = getNeighborClosestToOrientation(probe, -downAxis, usedNeighbors);
 
 func setClosestProbeToEmptyOcts(oct : Dictionary):
 	if oct.children.size() > 0:
@@ -364,6 +333,20 @@ func addOctreeVisualVertices(st : SurfaceTool, oct : Dictionary):
 	addQuad(st, [Vector3(x,y,z2), Vector3(x,y,z), Vector3(x,y2,z), Vector3(x,y2,z2)], Vector3.LEFT);
 	addQuad(st, [Vector3(x,y2,z), Vector3(x2,y2,z), Vector3(x2,y2,z2), Vector3(x,y2,z2)], Vector3.UP);
 	addQuad(st, [Vector3(x2,y,z2), Vector3(x2,y,z), Vector3(x,y,z), Vector3(x,y,z2)], Vector3.DOWN);
+
+func addQuadColor(st : SurfaceTool, vertices : Array, color : Color):
+	st.set_color(color);
+	st.add_vertex(vertices[0]);
+	st.set_color(color);
+	st.add_vertex(vertices[1]);
+	st.set_color(color);
+	st.add_vertex(vertices[3]);
+	st.set_color(color);
+	st.add_vertex(vertices[3]);
+	st.set_color(color);
+	st.add_vertex(vertices[1]);
+	st.set_color(color);
+	st.add_vertex(vertices[2]);
 	
 func addQuad(st : SurfaceTool, vertices : Array, normal : Vector3):
 	st.set_normal(normal);
@@ -485,7 +468,7 @@ func createProbe(space, query, probe, pos, x, y, z, collided, result, directions
 			break;
 	
 	if(collided.size() > 0):
-		probeList.push_back({"index": probeList.size(), "position": pos, "collisions": collided, "probeType": probeType, "neighbors": [], "rightNeighbor": -1, "downNeighbor": -1, "leftNeighbor": -1, "upNeighbor": -1});
+		probeList.push_back({"index": probeList.size(), "position": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
 
 func deleteNavMesh():
 	if(probeList == [] and mainOct == {}):

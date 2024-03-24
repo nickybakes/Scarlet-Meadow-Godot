@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode unshaded, cull_disabled, shadows_disabled, blend_mix;
+render_mode unshaded, cull_disabled, shadows_disabled;
 
 void vertex() {
 	// Called for every vertex the material is visible on.
@@ -7,7 +7,6 @@ void vertex() {
 
 void fragment() {
 	ALBEDO = COLOR.rgb;
-	ALPHA = .6;
 	// Called for every pixel the material is visible on.
 }
 
