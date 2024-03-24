@@ -20,6 +20,16 @@ extends Node3D
 	set(value):
 		deleteNavMesh();
 		
+@export_category("Visuals For Debuggin")
+
+@export var CreateNavMeshVisual := false:
+	set(value):
+		createNavMeshVisual();
+		
+@export var DeleteNavMeshVisual := false:
+	set(value):
+		deleteNavMeshVisual();
+		
 @export var CreateOctreeVisual := false:
 	set(value):
 		createOctreeVisual();
@@ -30,17 +40,7 @@ extends Node3D
 		
 @export var probeDebugButton := false:
 	set(value):
-		#var mostNeighbors = 0;
-		#var index = 0;
-		#for probe in probeList:
-			#if(probe.neighbors.size() > mostNeighbors):
-				#mostNeighbors = probe.neighbors.size();
-				#index = probe.index;
-				#
-		#print(index);
-		#print(mostNeighbors);
-		#print(probeList[index]);
-		print(probeList[0]);
+		print(getPossibleProbeAtPoint(Vector3(-10, .3, -1)));
 		
 var navMeshMaterial = preload("res://Dev/Nav/M_NavMesh_01.tres");
 var octreeVisualMaterial = preload("res://Dev/Nav/M_NavBoundary_01.tres");
@@ -184,33 +184,64 @@ func createNavMesh():
 			print("Finalizing mesh...");
 			currentStep += 1;
 		13:
-			var oldMesh = get_node_or_null("../NavMeshVisualizer");
-			if(oldMesh != null):
-				oldMesh.free();
-				
-			var st = SurfaceTool.new();
-			st.begin(Mesh.PRIMITIVE_TRIANGLES)
-			var size = .3;
-			for probe in probeList:
-				addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], getVertexColor(probe.probeType));
-				addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], getVertexColor(probe.probeType));
-				addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], getVertexColor(probe.probeType));
-
-			var arrayMesh = st.commit();
-			var visualMesh = MeshInstance3D.new()
-			visualMesh.set_name("NavMeshVisualizer")
-			visualMesh.mesh = arrayMesh;
-			visualMesh.set_surface_override_material(0, navMeshMaterial);
-			visualMesh.set_cast_shadows_setting(GeometryInstance3D.SHADOW_CASTING_SETTING_OFF);
-			get_tree().edited_scene_root.add_child(visualMesh, true);
-			visualMesh.owner = get_tree().edited_scene_root;
+			createNavMeshVisual();
 			currentStep += 1;
 		_:
-			print("~~~~~~~~~~~~~~");			
-			print("Nav mesh created!")			
+			print("~~~~~~~~~~~~~~");
+			print("Nav mesh created!")
 			creatingNavMesh = false;
 			currentStep += 1;
 	
+	
+func getProbeClosestToPoint(point : Vector3) -> Dictionary:
+	var oct = getOctFromPoint(point);
+	if(oct.probes.size() == 0):
+		return probeList[oct.closestProbeIfEmpty];
+	var closestProbe = oct.probes[0];
+	var closestDistanceSquared = 1.79769e308;
+	if(oct.probes.size() > 1):
+		for probe in oct.probes:
+			var dist = probeList[probe].position.distance_squared_to(point);
+			if(dist < closestDistanceSquared):
+				closestDistanceSquared = dist;
+				closestProbe = probeList[probe];
+	return closestProbe;
+	
+func createNavMeshVisual():
+	if(mainOct == {} or probeList == []):
+		print("No nav mesh made yet! Create a nav mesh first!")
+		return;
+	
+	var oldMesh = get_node_or_null("../NavMeshVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+		
+	var st = SurfaceTool.new();
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var size = .3;
+	for probe in probeList:
+		addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], getVertexColor(probe.probeType));
+		addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], getVertexColor(probe.probeType));
+		addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], getVertexColor(probe.probeType));
+
+	var arrayMesh = st.commit();
+	var visualMesh = MeshInstance3D.new()
+	visualMesh.set_name("NavMeshVisualizer")
+	visualMesh.mesh = arrayMesh;
+	visualMesh.set_surface_override_material(0, navMeshMaterial);
+	visualMesh.set_cast_shadows_setting(GeometryInstance3D.SHADOW_CASTING_SETTING_OFF);
+	get_tree().edited_scene_root.add_child(visualMesh, true);
+	visualMesh.owner = get_tree().edited_scene_root;
+		
+	return;
+
+func deleteNavMeshVisual():
+	var oldMesh = get_node_or_null("../NavMeshVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+		print("Nav mesh visual deleted!");
+	else:
+		print("No nav mesh visual to delete!");
 
 func getVertexColor(probeType : PROBETYPE) -> Color:
 	var color = Color(0, 0, 0);
