@@ -40,7 +40,10 @@ extends Node3D
 		
 @export var probeDebugButton := false:
 	set(value):
-		print(getPossibleProbeAtPoint(Vector3(-10, .3, -1)));
+		var start = $"../NavPathStart";
+		var end = $"../NavPathEnd";
+		var path = shortestPath(end.position, start.position);
+		drawShortestPath(path);
 		
 var navMeshMaterial = preload("res://Dev/Nav/M_NavMesh_01.tres");
 var octreeVisualMaterial = preload("res://Dev/Nav/M_NavBoundary_01.tres");
@@ -193,11 +196,72 @@ func createNavMesh():
 			currentStep += 1;
 	
 	
+func drawShortestPath(path : Array):
+	var oldMesh = get_node_or_null("../ShortestPathVisualizer");
+	if(oldMesh != null):
+		oldMesh.free();
+		
+	var st = SurfaceTool.new();
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var size = .2;
+	for i in path.size() - 1:
+		var pA = path[i].position;
+		var pB = path[i + 1].position;
+		addQuadColor(st, [pA + (Vector3(0, 0, 1) * size), pA + (Vector3(0, 0, -1) * size), pB + (Vector3(0, 0, -1) * size), pB + (Vector3(0, 0, 1) * size)], Color.BLACK);
+		addQuadColor(st, [pA + (Vector3(1, 0, 0) * size), pA + (Vector3(-1, 0, 0) * size), pB + (Vector3(-1, 0, 0) * size), pB + (Vector3(1, 0, 0) * size)], Color.BLACK);
+		addQuadColor(st, [pA + (Vector3(0, 1, 0) * size), pA + (Vector3(0, -1, 0) * size), pB + (Vector3(0, -1, 0) * size), pB + (Vector3(0, 1, 0) * size)], Color.BLACK);
+
+
+	var arrayMesh = st.commit();
+	var visualMesh = MeshInstance3D.new()
+	visualMesh.set_name("ShortestPathVisualizer")
+	visualMesh.mesh = arrayMesh;
+	visualMesh.set_surface_override_material(0, navMeshMaterial);
+	visualMesh.set_cast_shadows_setting(GeometryInstance3D.SHADOW_CASTING_SETTING_OFF);
+	get_tree().edited_scene_root.add_child(visualMesh, true);
+	visualMesh.owner = get_tree().edited_scene_root;
+
+func getCleanProbe(probe : Dictionary) -> Dictionary:
+	return {"index": probe.index, "position": probe.position, "probeType": probe.probeType};
+	
+func shortestPath(start : Vector3, end : Vector3) -> Array:
+	var startProbe = getProbeClosestToPoint(start);
+	var endProbe = getProbeClosestToPoint(end);
+	var visited = {startProbe.index: true};
+	var startProbeClean = getCleanProbe(startProbe);
+	var endProbeClean = getCleanProbe(endProbe);
+	var finalPath = [startProbeClean];
+	var currentProbe = startProbe;
+	while currentProbe.position != endProbe.position:
+		var closestDistanceSquared = 1.79769e308;
+		var bestNeighbor = {};
+		for neighborIndex in currentProbe.neighbors:
+			if(visited.has(neighborIndex)):
+				continue;
+			var neighbor = probeList[neighborIndex];
+			var dist = neighbor.position.distance_squared_to(endProbe.position);
+			if(dist < closestDistanceSquared):
+				closestDistanceSquared = dist;
+				bestNeighbor = neighbor;
+		if(bestNeighbor == {}):
+			if(finalPath.size() == 1):
+				print("Could not find a path!");
+				return finalPath;
+			finalPath.resize(finalPath.size() - 1);
+		else:
+			finalPath.push_back(getCleanProbe(bestNeighbor));
+			visited[bestNeighbor.index] = true;
+		currentProbe = probeList[finalPath[finalPath.size() - 1].index];
+			
+	
+	finalPath.push_back(endProbeClean);
+	return finalPath;
+
 func getProbeClosestToPoint(point : Vector3) -> Dictionary:
 	var oct = getOctFromPoint(point);
 	if(oct.probes.size() == 0):
 		return probeList[oct.closestProbeIfEmpty];
-	var closestProbe = oct.probes[0];
+	var closestProbe = probeList[oct.probes[0]];
 	var closestDistanceSquared = 1.79769e308;
 	if(oct.probes.size() > 1):
 		for probe in oct.probes:
