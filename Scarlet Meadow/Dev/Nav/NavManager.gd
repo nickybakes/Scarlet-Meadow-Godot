@@ -42,7 +42,7 @@ extends Node3D
 	set(value):
 		var start = $"../NavPathStart";
 		var end = $"../NavPathEnd";
-		var path = shortestPath(end.position, start.position);
+		var path = shortestPath(start.position, end.position);
 		drawShortestPath(path);
 		
 var navMeshMaterial = preload("res://Dev/Nav/M_NavMesh_01.tres");
@@ -233,15 +233,15 @@ func shortestPath(start : Vector3, end : Vector3) -> Array:
 	var finalPath = [startProbeClean];
 	var currentProbe = startProbe;
 	while currentProbe.position != endProbe.position:
-		var closestDistanceSquared = 1.79769e308;
+		var highestDot = -1;
 		var bestNeighbor = {};
 		for neighborIndex in currentProbe.neighbors:
 			if(visited.has(neighborIndex)):
 				continue;
 			var neighbor = probeList[neighborIndex];
-			var dist = neighbor.position.distance_squared_to(endProbe.position);
-			if(dist < closestDistanceSquared):
-				closestDistanceSquared = dist;
+			var dot = (neighbor.position - currentProbe.position).normalized().dot((endProbe.position - currentProbe.position).normalized());
+			if(dot > highestDot):
+				highestDot = dot;
 				bestNeighbor = neighbor;
 		if(bestNeighbor == {}):
 			if(finalPath.size() == 1):
