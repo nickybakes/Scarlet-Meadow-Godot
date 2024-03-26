@@ -1,6 +1,8 @@
 @tool
 extends Node3D
 
+const FLOAT_MAX = 1.79769e308;
+
 @export var showBoundary := true:
 	set(value):
 		boundaryMesh.visible = value;
@@ -64,6 +66,11 @@ var probeList;
 
 var mainOct;
 
+var navPathStart = null;
+var navPathStartPosition = Vector3.ZERO;
+var navPathEnd = null;
+var navPathEndPosition = Vector3.ZERO;
+
 #midPoint, childOcts, numberOfProbes, closestOctWithProbes
 
 func _get_property_list():
@@ -91,6 +98,9 @@ func _ready():
 		if(createNavOnPlay):
 			currentStep = 0;
 			creatingNavMesh = true;
+	else:
+		navPathStart = get_node_or_null("../NavPathStart");
+		navPathEnd = get_node_or_null("../NavPathEnd");
 
 func createNavMesh():
 	
@@ -233,15 +243,15 @@ func shortestPath(start : Vector3, end : Vector3) -> Array:
 	var finalPath = [startProbeClean];
 	var currentProbe = startProbe;
 	while currentProbe.position != endProbe.position:
-		var highestDot = -1;
+		var closestDistanceSquared = FLOAT_MAX;
 		var bestNeighbor = {};
 		for neighborIndex in currentProbe.neighbors:
 			if(visited.has(neighborIndex)):
 				continue;
 			var neighbor = probeList[neighborIndex];
-			var dot = (neighbor.position - currentProbe.position).normalized().dot((endProbe.position - currentProbe.position).normalized());
-			if(dot > highestDot):
-				highestDot = dot;
+			var dist = neighbor.position.distance_squared_to(endProbe.position);
+			if(dist < closestDistanceSquared):
+				closestDistanceSquared = dist;
 				bestNeighbor = neighbor;
 		if(bestNeighbor == {}):
 			if(finalPath.size() == 1):
@@ -262,7 +272,7 @@ func getProbeClosestToPoint(point : Vector3) -> Dictionary:
 	if(oct.probes.size() == 0):
 		return probeList[oct.closestProbeIfEmpty];
 	var closestProbe = probeList[oct.probes[0]];
-	var closestDistanceSquared = 1.79769e308;
+	var closestDistanceSquared = FLOAT_MAX;
 	if(oct.probes.size() > 1):
 		for probe in oct.probes:
 			var dist = probeList[probe].position.distance_squared_to(point);
@@ -354,7 +364,7 @@ func setClosestProbeToEmptyOcts(oct : Dictionary):
 		for child in oct.children:
 			setClosestProbeToEmptyOcts(child);
 	elif oct.probes.size() == 0:
-		var closestDistanceSquared = 1.79769e308;
+		var closestDistanceSquared = FLOAT_MAX;
 		for probe in probeList:
 			var dist = oct.center.distance_squared_to(probe.position);
 			if(dist < closestDistanceSquared):
@@ -581,4 +591,11 @@ func deleteNavMesh():
 func _process(delta):
 	if(creatingNavMesh):
 		createNavMesh();
+	else:
+		if(navPathStart != null and navPathEnd != null):
+			if(navPathStart.position != navPathStartPosition or navPathEnd.position != navPathEndPosition):
+				navPathStartPosition = navPathStart.position;
+				navPathEndPosition = navPathEnd.position;
+				var path = shortestPath(navPathStartPosition, navPathEndPosition);
+				drawShortestPath(path);
 	pass
