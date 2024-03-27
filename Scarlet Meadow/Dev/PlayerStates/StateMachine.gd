@@ -55,7 +55,7 @@ func transition_to(target_state: Enums.STATE, msg: Dictionary = {}) -> void:
 	if not has_node(state_name):
 		return
 		
-	print(str(Time.get_ticks_msec()) + " " + state_name)
+	print(str(Time.get_ticks_msec()/1000.0) + " " + state_name)
 
 	previousState = currentState
 

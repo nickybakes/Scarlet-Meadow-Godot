@@ -1,11 +1,25 @@
 # Run.gd
 extends PlayerState
 
+var startPos;
+var endPos;
+
 func _init():
 	rotation_mode = Enums.ROTATION_MODE.None
 	
 func enter(previousState : Enums.STATE, _msg := {}):
 	speed_multiplier = 1;
+	startPos = player.position;
+
+func exit():
+	endPos = player.position;
+	print(startPos);
+	print(endPos);
+	var horDist = Vector2(startPos.x, startPos.z).distance_to(Vector2(endPos.x, endPos.z));
+	var verDist = endPos.y - startPos.y;
+	print(horDist);
+	print(horDist/11.0);
+	print(verDist);
 
 func update(delta: float) -> void:
 	

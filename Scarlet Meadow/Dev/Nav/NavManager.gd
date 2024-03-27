@@ -2,15 +2,17 @@
 extends Node3D
 
 const FLOAT_MAX = 1.79769e308;
+const WORLD_COLLISION_MASK = 0b0011;
 
 @export var showBoundary := true:
 	set(value):
-		boundaryMesh.visible = value;
-		showBoundary = value;
+		if(boundaryMesh != null):
+			boundaryMesh.visible = value;
+			showBoundary = value;
 @export_range(1, 3, .5) var voxelSize := 2.0
 @export_range(1, 8) var octreeDepth := 3
 @export var createNavOnPlay := false;
-@onready var boundaryMesh = $BoundaryMesh;
+@onready var boundaryMesh = get_node_or_null("BoundaryMesh");
 
 @export_category("Commands")
 @export var CreateNavMesh: bool:
@@ -46,7 +48,13 @@ const FLOAT_MAX = 1.79769e308;
 		var end = $"../NavPathEnd";
 		var path = shortestPath(start.position, end.position);
 		drawShortestPath(path);
-		
+
+@export_range(0, 99) var islandDebug := 0:
+	set(value):
+		if(value < islandList.size()):
+			islandDebug = value;
+			createNavMeshVisual();
+
 var navMeshMaterial = preload("res://Dev/Nav/M_NavMesh_01.tres");
 var octreeVisualMaterial = preload("res://Dev/Nav/M_NavBoundary_01.tres");
 
@@ -62,9 +70,10 @@ var currentCompletedOcts = 0;
 var currentCompletedProbes = 0;
 var creatingNavMesh := false;
 
+#nav mesh storage
 var probeList;
-
 var mainOct;
+var islandList;
 
 var navPathStart = null;
 var navPathStartPosition = Vector3.ZERO;
@@ -128,7 +137,7 @@ func createNavMesh():
 			currentStep += 1;
 		4:
 			var space = get_world_3d().direct_space_state;
-			var query = PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.DOWN, 0b0011)
+			var query = PhysicsRayQueryParameters3D.create(Vector3.ZERO, Vector3.DOWN, WORLD_COLLISION_MASK)
 			query.collide_with_areas = false
 			query.hit_back_faces = false
 			query.hit_from_inside = true
@@ -164,28 +173,69 @@ func createNavMesh():
 								continue;
 							var neighbor = getPossibleProbeAtPoint(probe.position + (Vector3(x, y, z) * voxelSize));
 							if(neighbor != -1):
+								if(probe.probeType == PROBETYPE.WALL and probeList[neighbor].probeType == PROBETYPE.WALL):
+									if(probe.collisions[0].normal.dot(probeList[neighbor].collisions[0].normal) < 0):
+										continue;
 								probe.neighbors.push_back(neighbor);
 			currentStep += 1;
 		9:
+			print("Shrinkwrapping probes...");
+			for probe in probeList:
+				probe.position = lerp(probe.position, probe.collisions[0].position, .5)
+			currentStep += 1;
+		10:
 			for probe in probeList:
 				#check if this is at the top of a wall and should be a VAULT type probe
 				if(probe.probeType == PROBETYPE.WALL):
+					var spawnedDropOff = false;
 					for neighborIndex in probe.neighbors:
 						var neighbor = probeList[neighborIndex];
-						if(neighbor.probeType == PROBETYPE.GROUND or neighbor.probeType == PROBETYPE.CLIMBSTART):
+						if(neighbor.probeType == PROBETYPE.GROUND or neighbor.probeType == PROBETYPE.CLIMBSTART or neighbor.probeType == PROBETYPE.DROPOFF):
 							if(probe.position.y < neighbor.position.y):
 								var dist1 = (probe.collisions[0].position).distance_squared_to(neighbor.collisions[0].position)
 								var dist2 = (probe.collisions[0].position + (probe.collisions[0].normal * .2)).distance_squared_to(neighbor.collisions[0].position + (neighbor.collisions[0].normal * .2))
 								if(dist1 < dist2):
 									probe.probeType = PROBETYPE.VAULT;
-									break;
-			currentStep += 1;
-		10:
-			print("Shrinkwrapping probes and creating final octree...");
-			for probe in probeList:
-				probe.position = lerp(probe.position, probe.collisions[0].position, .5)
+									neighbor.neighbors.erase(probe.index);
+									if(!spawnedDropOff):
+										probeList.push_back({"index": probeList.size(), "position": Vector3(probe.position.x, neighbor.position.y, probe.position.z), "collisions": probe.collisions, "probeType": PROBETYPE.DROPOFF, "neighbors": [], "island": -1});
+										neighbor.neighbors.push_front(probeList.size() - 1);
+										spawnedDropOff = true;
 			currentStep += 1;
 		11:
+			print("Creating islands...");
+			islandList = [];
+			currentStep += 1;
+		12:
+			for probe in probeList:
+				if(probe.island != -1):
+					continue;
+				probe.island = islandList.size();
+				islandList.push_back({"index": islandList.size(), "probes": [probe.index], "islandType": getIslandTypeFromProbeType(probe.probeType)});
+				addNeighborsToIsland(probe);
+			
+			print(str(islandList.size()) + " islands created");
+			currentStep += 1;
+		13:
+			for probe in probeList:
+				if(probe.probeType == PROBETYPE.DROPOFF):
+					for island in islandList:
+						if(island.index != probe.island):
+							var closestProbe = {};
+							if(island.islandType == ISLANDTYPE.GROUND):
+								closestProbe = getClosestProbeInIslandToPoint(probe.position, island, 0, 1);
+							if(island.islandType == ISLANDTYPE.WALL):
+								closestProbe = getClosestProbeInIslandToPoint(probe.position, island, 8, -.2);
+							if(closestProbe != {}):
+								var horDist = Vector2(probe.position.x, probe.position.z).distance_to(Vector2(closestProbe.position.x, closestProbe.position.z));
+								var verDist = probe.position.y - closestProbe.position.y;
+								var t = horDist/11.0;
+								var y = verDist + (17.5*t) - (22.5*(pow(t, 2.0)));
+								if(y > 0):
+									probe.neighbors.push_back(closestProbe.index);
+			currentStep += 1;
+		14:
+			print("Creating final octree...");
 			createOctree();
 			#for empty leaf octs (octs at the end of a brand who have no more children),
 			#find the closest probe to them so if we try to find a probe in this empty oct
@@ -193,10 +243,10 @@ func createNavMesh():
 			for child in mainOct.children:
 				setClosestProbeToEmptyOcts(child);
 			currentStep += 1;
-		12:
+		15:
 			print("Finalizing mesh...");
 			currentStep += 1;
-		13:
+		16:
 			createNavMeshVisual();
 			currentStep += 1;
 		_:
@@ -204,6 +254,67 @@ func createNavMesh():
 			print("Nav mesh created!")
 			creatingNavMesh = false;
 			currentStep += 1;
+	
+	
+func raycast(start : Vector3, end : Vector3) -> Dictionary:
+	var space = get_world_3d().direct_space_state;
+	var query = PhysicsRayQueryParameters3D.create(start, end, WORLD_COLLISION_MASK)
+	query.collide_with_areas = false
+	query.hit_back_faces = false
+	query.hit_from_inside = true
+	var probe;
+	var pos;
+	var collided = [];
+	return space.intersect_ray(query);
+	
+func getClosestProbeInIslandToPoint(point : Vector3, island : Dictionary, minDistance : float, maxDot : float) -> Dictionary:
+	var closestDistanceSquared = FLOAT_MAX;
+	var closestProbe = {};
+	minDistance = pow(minDistance, 2);
+	for probeIndex in island.probes:
+		var probe = probeList[probeIndex];
+		var dist = probe.position.distance_squared_to(point);
+		if(probe.probeType != PROBETYPE.DROPOFF and probe.collisions[0].normal.dot((probe.position - point).normalized()) < maxDot and raycast(point, probe.position) == {} and dist > minDistance and dist < closestDistanceSquared):
+			closestDistanceSquared = dist;
+			closestProbe = probe;
+	return closestProbe;
+				
+func addNeighborsToIsland(probe : Dictionary):
+	for neighborIndex in probe.neighbors:
+		var neighbor = probeList[neighborIndex];
+		if(neighbor.island != -1):
+			continue;
+		if((probe.probeType == PROBETYPE.GROUND or probe.probeType == PROBETYPE.CLIMBSTART  or probe.probeType == PROBETYPE.DROPOFF) and (neighbor.probeType == PROBETYPE.GROUND or neighbor.probeType == PROBETYPE.CLIMBSTART or neighbor.probeType == PROBETYPE.DROPOFF)):
+			neighbor.island = probe.island;
+			islandList[probe.island].probes.push_back(neighbor.index);
+			addNeighborsToIsland(neighbor);
+		if((probe.probeType == PROBETYPE.WALL or probe.probeType == PROBETYPE.VAULT) and (neighbor.probeType == PROBETYPE.WALL or neighbor.probeType == PROBETYPE.VAULT)):
+			if(getBestFitAxis(probe.collisions[0].normal) == getBestFitAxis(neighbor.collisions[0].normal)):
+				neighbor.island = probe.island;
+				islandList[probe.island].probes.push_back(neighbor.index);
+				addNeighborsToIsland(neighbor);
+
+enum ISLANDTYPE{
+	GROUND,
+	WALL
+}
+
+func getIslandTypeFromProbeType(probeType : PROBETYPE) -> ISLANDTYPE:
+	if(probeType == PROBETYPE.GROUND or probeType == PROBETYPE.CLIMBSTART or probeType == PROBETYPE.DROPOFF):
+		return ISLANDTYPE.GROUND;
+	return ISLANDTYPE.WALL;
+
+func getBestFitAxis(normal : Vector3) -> Vector3:
+	var axis = [Vector3.FORWARD, Vector3.RIGHT, Vector3.BACK, Vector3.LEFT];
+	var highestDot = -1;
+	var bestAxis = axis[0];
+	for ax in axis:
+		var dot = normal.dot(ax);
+		if(dot > highestDot):
+			highestDot = dot;
+			bestAxis = ax;
+		
+	return bestAxis;
 	
 	
 func drawShortestPath(path : Array):
@@ -294,9 +405,12 @@ func createNavMeshVisual():
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var size = .3;
 	for probe in probeList:
-		addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], getVertexColor(probe.probeType));
-		addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], getVertexColor(probe.probeType));
-		addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], getVertexColor(probe.probeType));
+		var color = getVertexColor(probe.probeType);
+		if(probe.island == islandDebug):
+			color = Color.BLACK;
+		addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], color);
+		addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], color);
+		addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], color);
 
 	var arrayMesh = st.commit();
 	var visualMesh = MeshInstance3D.new()
@@ -328,6 +442,8 @@ func getVertexColor(probeType : PROBETYPE) -> Color:
 			color = Color(1, 0.8, 0);
 		PROBETYPE.CLIMBSTART:
 			color = Color(1, 0.0, 0);
+		PROBETYPE.DROPOFF:
+			color = Color(1, 0.2, 0);
 	return color;
 
 func getNeighborClosestToOrientation(probe: Dictionary, axis : Vector3, usedNeighbors : Array) -> int:
@@ -542,6 +658,7 @@ enum PROBETYPE {
 	WALL,
 	VAULT,
 	CLIMBSTART,
+	DROPOFF,
 	NONE
 }
 
@@ -573,7 +690,7 @@ func createProbe(space, query, probe, pos, x, y, z, collided, result, directions
 			break;
 	
 	if(collided.size() > 0):
-		probeList.push_back({"index": probeList.size(), "position": pos, "collisions": collided, "probeType": probeType, "neighbors": []});
+		probeList.push_back({"index": probeList.size(), "position": pos, "collisions": collided, "probeType": probeType, "neighbors": [], "island": -1});
 
 func deleteNavMesh():
 	if(probeList == [] and mainOct == {}):
@@ -596,6 +713,10 @@ func _process(delta):
 			if(navPathStart.position != navPathStartPosition or navPathEnd.position != navPathEndPosition):
 				navPathStartPosition = navPathStart.position;
 				navPathEndPosition = navPathEnd.position;
-				var path = shortestPath(navPathStartPosition, navPathEndPosition);
+				var stProbe = getProbeClosestToPoint(navPathStartPosition);
+				var path = [stProbe];
+				for neighbor in stProbe.neighbors:
+					path.push_back(probeList[neighbor]);
+					path.push_back(stProbe);
 				drawShortestPath(path);
 	pass

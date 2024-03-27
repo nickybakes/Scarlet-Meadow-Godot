@@ -1,10 +1,24 @@
-- wall/vault probes can only be neighbors with probes with collision normals with dot product above 0
-- drop off probes (the ground nodes that are connected to vault nodes)
+//- wall/vault probes can only be neighbors with probes with collision normals with dot product above 0
+
+//- drop off probes (the ground nodes that are connected to vault nodes)
 - loop through final path and see if any neighbors of the current probe are later in the list, if so, cut out the in between (might be inefficient, try to not have to do this)
 - have path start at start AND end and meet in the center (probably not possible)
 - connect wall nodes up to vault/drop off
 - have drop off nodes at the bottom of a wall if theres no immediate ground there
 - shoot ray down from each wall probe, find closest ground probe, that becomes the wall drop off point?
-- flood fill connected neighbors of same type and create islands
+//- flood fill connected neighbors of same type and create islands
 - island transition probes
-- wall islands: facing same axis and are connected neighbors
+//- wall islands: facing same axis and are connected neighbors
+
+
+- loop through islands, find each island's directly connected islands (and which probes are those connections)
+- score each connection's speed
+	from fastest to slowest:
+	drop off
+	walking (ground/climbstart to ground/climbstart)
+	ground/climbstart to vault
+	ground/climbstart to wall
+	wall to wall
+- recursivley go through all islands and find the fastest way to connect each one to eachother
+- for shortest path: find starting island and ending island and just follow the prebaked island path
+- do shortest path within each island to get from connection to connection
