@@ -10,11 +10,14 @@
 - island transition probes
 //- wall islands: facing same axis and are connected neighbors
 
+"connections": []
+connection: {"probe": index, "neighbor": index}
 
-- loop through islands, find each island's directly connected islands (and which probes are those connections)
-- score each connection's speed
+//- loop through islands, find each island's directly connected islands (and which probes are those connections)
+//- score each connection's speed
 	from fastest to slowest:
-	drop off
+	drop off to ground
+	drop off to wall
 	walking (ground/climbstart to ground/climbstart)
 	ground/climbstart to vault
 	ground/climbstart to wall

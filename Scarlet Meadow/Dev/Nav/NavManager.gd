@@ -46,8 +46,9 @@ const WORLD_COLLISION_MASK = 0b0011;
 	set(value):
 		var start = $"../NavPathStart";
 		var end = $"../NavPathEnd";
-		var path = shortestPath(start.position, end.position);
-		drawShortestPath(path);
+		var path = shortestPathFull(start.position, end.position);
+		if(path != []):
+			drawShortestPath(path);
 
 @export_range(0, 99) var islandDebug := 0:
 	set(value):
@@ -68,6 +69,11 @@ var numOcts = 0;
 var numProbes = 0;
 var currentCompletedOcts = 0;
 var currentCompletedProbes = 0;
+var currentIslandPath;
+var currentIslandScore;
+var finalIslandPath;
+var finalIslandScore;
+var islandVisited;
 var creatingNavMesh := false;
 
 #nav mesh storage
@@ -94,6 +100,12 @@ func _get_property_list():
 	properties.append({
 		"name": "mainOct",
 		"type": TYPE_DICTIONARY,
+		"usage": PROPERTY_USAGE_STORAGE,
+	})
+	
+	properties.append({
+		"name": "islandList",
+		"type": TYPE_ARRAY,
 		"usage": PROPERTY_USAGE_STORAGE,
 	})
 
@@ -128,6 +140,8 @@ func createNavMesh():
 			print("Creating probes...");
 			currentStep += 1;
 		3:
+			position = snapped(position, Vector3(.5, .5, .5));
+			scale = snapped(scale, Vector3(.25, .25, .25));
 			boundsMax = position + Vector3(scale.x * 25, scale.y * 25, scale.z * 25);
 			boundsMin = position + Vector3(scale.x * -25, scale.y * -25, scale.z * -25);
 			probeAmount = Vector3(abs(boundsMax - boundsMin)/voxelSize);
@@ -198,8 +212,12 @@ func createNavMesh():
 									probe.probeType = PROBETYPE.VAULT;
 									neighbor.neighbors.erase(probe.index);
 									if(!spawnedDropOff):
-										probeList.push_back({"index": probeList.size(), "position": Vector3(probe.position.x, neighbor.position.y, probe.position.z), "collisions": probe.collisions, "probeType": PROBETYPE.DROPOFF, "neighbors": [], "island": -1});
-										neighbor.neighbors.push_front(probeList.size() - 1);
+										var dropOffPoition = Vector3(probe.position.x, neighbor.position.y, probe.position.z);
+										probeList.push_back({"index": probeList.size(), "position": dropOffPoition, "collisions": probe.collisions, "probeType": PROBETYPE.DROPOFF, "neighbors": [neighbor.index], "island": -1});
+										for neighborIndex2 in neighbor.neighbors:
+											if(!probeList[neighborIndex2].neighbors.has(probeList.size() - 1) and probeList[neighborIndex2].position.distance_to(dropOffPoition) < voxelSize):
+												probeList[neighborIndex2].neighbors.push_back(probeList.size() - 1);
+										neighbor.neighbors.push_back(probeList.size() - 1);
 										spawnedDropOff = true;
 			currentStep += 1;
 		11:
@@ -211,7 +229,7 @@ func createNavMesh():
 				if(probe.island != -1):
 					continue;
 				probe.island = islandList.size();
-				islandList.push_back({"index": islandList.size(), "probes": [probe.index], "islandType": getIslandTypeFromProbeType(probe.probeType)});
+				islandList.push_back({"index": islandList.size(), "probes": [probe.index], "islandType": getIslandTypeFromProbeType(probe.probeType), "connections": []});
 				addNeighborsToIsland(probe);
 			
 			print(str(islandList.size()) + " islands created");
@@ -235,6 +253,16 @@ func createNavMesh():
 									probe.neighbors.push_back(closestProbe.index);
 			currentStep += 1;
 		14:
+			#finding all direct connections between each island
+			for island in islandList:
+				for probeIndex in island.probes:
+					var probe = probeList[probeIndex];
+					for neighborIndex in probe.neighbors:
+						var neighbor = probeList[neighborIndex];
+						if(neighbor.island != island.index):
+							island.connections.push_back({"from": probe.index, "to": neighbor.index, "distance": probeList[probe.index].position.distance_to(probeList[neighbor.index].position)});
+			currentStep += 1;
+		15:
 			print("Creating final octree...");
 			createOctree();
 			#for empty leaf octs (octs at the end of a brand who have no more children),
@@ -243,10 +271,10 @@ func createNavMesh():
 			for child in mainOct.children:
 				setClosestProbeToEmptyOcts(child);
 			currentStep += 1;
-		15:
+		16:
 			print("Finalizing mesh...");
 			currentStep += 1;
-		16:
+		17:
 			createNavMeshVisual();
 			currentStep += 1;
 		_:
@@ -255,6 +283,38 @@ func createNavMesh():
 			creatingNavMesh = false;
 			currentStep += 1;
 	
+func islandShortestPath(currentIsland : Dictionary, homeIsland : Dictionary, goalIsland : Dictionary):
+	for connectionIndex in currentIsland.connections:
+		var connection = currentIsland.connections[connectionIndex];
+		if(!islandVisited.has(probeList[connection.to].island)):
+			if(probeList[connection.to].island == goalIsland.index):
+				if(currentIslandScore < finalIslandScore):
+					finalIslandScore = currentIslandScore;
+					finalIslandPath = currentIslandPath.duplicate();
+			elif(currentIslandScore + connection.score < finalIslandScore):
+				islandVisited[probeList[connection.to].island] = true;
+				currentIslandPath.push_back(connection);
+				currentIslandScore += connection.score;
+				islandShortestPath(islandList[probeList[connection.to].island], homeIsland, goalIsland);
+				islandVisited.erase(probeList[connection.to].island);
+				currentIslandPath.resize(currentIslandPath.size() - 1);
+				currentIslandScore -= connection.score;
+	
+func islandConnectScore(from : Dictionary, to : Dictionary) -> float:
+	var score = 0.0;
+	if(from.probeType == PROBETYPE.DROPOFF and getIslandTypeFromProbeType(to.probeType) == ISLANDTYPE.GROUND):
+		score = .1;
+	elif(from.probeType == PROBETYPE.DROPOFF and getIslandTypeFromProbeType(to.probeType) == ISLANDTYPE.WALL):
+		score = .2;
+	elif(getIslandTypeFromProbeType(from.probeType) == ISLANDTYPE.GROUND and getIslandTypeFromProbeType(to.probeType) == ISLANDTYPE.GROUND):
+		score = .25;
+	elif(getIslandTypeFromProbeType(from.probeType) == ISLANDTYPE.GROUND and to.probeType == PROBETYPE.VAULT):
+		score = .3;
+	elif(getIslandTypeFromProbeType(from.probeType) == ISLANDTYPE.GROUND and to.probeType == PROBETYPE.WALL):
+		score = .35;
+	elif(getIslandTypeFromProbeType(from.probeType) == ISLANDTYPE.WALL and getIslandTypeFromProbeType(to.probeType) == ISLANDTYPE.WALL):
+		score = .4;
+	return score;
 	
 func raycast(start : Vector3, end : Vector3) -> Dictionary:
 	var space = get_world_3d().direct_space_state;
@@ -274,7 +334,7 @@ func getClosestProbeInIslandToPoint(point : Vector3, island : Dictionary, minDis
 	for probeIndex in island.probes:
 		var probe = probeList[probeIndex];
 		var dist = probe.position.distance_squared_to(point);
-		if(probe.probeType != PROBETYPE.DROPOFF and probe.collisions[0].normal.dot((probe.position - point).normalized()) < maxDot and raycast(point, probe.position) == {} and dist > minDistance and dist < closestDistanceSquared):
+		if(probe.probeType != PROBETYPE.DROPOFF and probe.collisions[0].normal.dot((probe.position - point).normalized()) < maxDot and dist > minDistance and dist < closestDistanceSquared and raycast(point, probe.position) == {}):
 			closestDistanceSquared = dist;
 			closestProbe = probe;
 	return closestProbe;
@@ -344,39 +404,84 @@ func drawShortestPath(path : Array):
 
 func getCleanProbe(probe : Dictionary) -> Dictionary:
 	return {"index": probe.index, "position": probe.position, "probeType": probe.probeType};
-	
-func shortestPath(start : Vector3, end : Vector3) -> Array:
-	var startProbe = getProbeClosestToPoint(start);
-	var endProbe = getProbeClosestToPoint(end);
-	var visited = {startProbe.index: true};
-	var startProbeClean = getCleanProbe(startProbe);
-	var endProbeClean = getCleanProbe(endProbe);
-	var finalPath = [startProbeClean];
-	var currentProbe = startProbe;
-	while currentProbe.position != endProbe.position:
+
+func shortestPathProbe(from : Dictionary, to : Dictionary) -> Array:
+	var visited = {from.index: true};
+	var finalPath = [];
+	var currentProbe = from;
+	while currentProbe.index != to.index:
 		var closestDistanceSquared = FLOAT_MAX;
 		var bestNeighbor = {};
 		for neighborIndex in currentProbe.neighbors:
-			if(visited.has(neighborIndex)):
+			if(visited.has(neighborIndex) or probeList[neighborIndex].island != to.island):
 				continue;
 			var neighbor = probeList[neighborIndex];
-			var dist = neighbor.position.distance_squared_to(endProbe.position);
+			var dist = neighbor.position.distance_squared_to(to.position);
 			if(dist < closestDistanceSquared):
 				closestDistanceSquared = dist;
 				bestNeighbor = neighbor;
 		if(bestNeighbor == {}):
-			if(finalPath.size() == 1):
+			if(finalPath.size() == 0):
 				print("Could not find a path!");
 				return finalPath;
-			finalPath.resize(finalPath.size() - 1);
+			else:
+				finalPath.resize(finalPath.size() - 1);
 		else:
-			finalPath.push_back(getCleanProbe(bestNeighbor));
+			finalPath.push_back(bestNeighbor);
 			visited[bestNeighbor.index] = true;
-		currentProbe = probeList[finalPath[finalPath.size() - 1].index];
-			
-	
-	finalPath.push_back(endProbeClean);
+		if(finalPath.size() != 0):
+			currentProbe = probeList[finalPath[finalPath.size() - 1].index];
+		else:
+			currentProbe = from;
 	return finalPath;
+
+func shortestPathFull(start : Vector3, end : Vector3) -> Array:
+	var startProbe = getProbeClosestToPoint(start);
+	var endProbe = getProbeClosestToPoint(end);
+	var finalPathDirty = [startProbe];
+	
+	if(startProbe.island == endProbe.island):
+		finalPathDirty.append_array(shortestPathProbe(startProbe, endProbe));
+	else:
+		var connections = [];
+		var currentIsland = islandList[startProbe.island];
+		var visited = {currentIsland.index: true};
+		while currentIsland.index != endProbe.island:
+			var closestDistanceSquared = FLOAT_MAX;
+			var bestConnection = {};
+			for con in currentIsland.connections:
+				if(visited.has(probeList[con.to].island)):
+					continue;
+				var dist = probeList[con.to].position.distance_squared_to(endProbe.position) + (con.distance*.6);
+				if(dist <= closestDistanceSquared):
+					closestDistanceSquared = dist;
+					bestConnection = con;
+			if(bestConnection == {}):
+				if(connections.size() == 0):
+					print("Could not find a connection!");
+					return [];
+				else:
+					connections.resize(connections.size() - 1);
+			else:
+				connections.push_back(bestConnection);
+				visited[probeList[bestConnection.to].island] = true;
+			if(connections.size() != 0):
+				currentIsland = islandList[probeList[connections[connections.size() - 1].to].island];
+			else:
+				currentIsland = islandList[startProbe.island];
+		
+		if connections.size() == 0:
+			return [];
+		
+		for connection in connections:
+			finalPathDirty.append_array(shortestPathProbe(finalPathDirty[finalPathDirty.size() - 1], probeList[connection.from]));
+			finalPathDirty.push_back(probeList[connection.to]);
+		finalPathDirty.append_array(shortestPathProbe(finalPathDirty[finalPathDirty.size() - 1], endProbe))
+		
+	var finalPathClean = [];
+	for step in finalPathDirty:
+		finalPathClean.push_back(getCleanProbe(step));
+	return finalPathClean;
 
 func getProbeClosestToPoint(point : Vector3) -> Dictionary:
 	var oct = getOctFromPoint(point);
@@ -406,8 +511,8 @@ func createNavMeshVisual():
 	var size = .3;
 	for probe in probeList:
 		var color = getVertexColor(probe.probeType);
-		if(probe.island == islandDebug):
-			color = Color.BLACK;
+		#if(probe.island == islandDebug):
+			#color = Color.BLACK;
 		addQuadColor(st, [probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 1, 0) * size), probe.position + (Vector3(-1, 0, 0) * size)], color);
 		addQuadColor(st, [probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(0, -1, 0) * size), probe.position + (Vector3(0, 0, 1) * size), probe.position + (Vector3(0, 1, 0) * size)], color);
 		addQuadColor(st, [probe.position + (Vector3(-1, 0, 0) * size), probe.position + (Vector3(0, 0, -1) * size), probe.position + (Vector3(1, 0, 0) * size), probe.position + (Vector3(0, 0, 1) * size)], color);
@@ -713,10 +818,13 @@ func _process(delta):
 			if(navPathStart.position != navPathStartPosition or navPathEnd.position != navPathEndPosition):
 				navPathStartPosition = navPathStart.position;
 				navPathEndPosition = navPathEnd.position;
-				var stProbe = getProbeClosestToPoint(navPathStartPosition);
-				var path = [stProbe];
-				for neighbor in stProbe.neighbors:
-					path.push_back(probeList[neighbor]);
-					path.push_back(stProbe);
-				drawShortestPath(path);
+				var path = shortestPathFull(navPathStartPosition, navPathEndPosition);
+				#var stProbe = getProbeClosestToPoint(navPathStartPosition);
+				#print(stProbe.position);
+				#var path = [stProbe];
+				#for neighbor in stProbe.neighbors:
+					#path.push_back(probeList[neighbor]);
+					#path.push_back(stProbe);
+				if(path.size() > 1):
+					drawShortestPath(path);
 	pass
